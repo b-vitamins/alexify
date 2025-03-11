@@ -15,39 +15,15 @@ def main():
     """
     Command-line entry point for 'alexify'.
 
-    This CLI provides three primary subcommands:
+    Subcommands:
+      - process:  scans original .bib files, tries to find a matching OpenAlex ID
+      - fetch:    fetches JSON metadata from OpenAlex for matched entries
+      - missing:  lists which entries have not been matched
 
-        1) process  => scans original .bib files, attempts to find a matching
-                       OpenAlex ID by either DOI or fuzzy matching on title and authors.
-                       Outputs a new '-oa.bib' file containing these OpenAlex IDs.
-
-        2) fetch    => using a previously processed '-oa.bib' file with OpenAlex IDs,
-                       fetch JSON metadata from OpenAlex for each matched entry,
-                       storing JSON in the specified output directory (organized by year).
-
-        3) missing  => reports which entries are missing an OpenAlex ID in a '-oa.bib' file.
-
-    Global Argument:
-        --email: Sets the email used by the Pyalex library. If unspecified, Pyalex
-                 will make requests without attaching any email contact. This is
-                 generally discouraged, so please provide an email when possible.
-
-    Example Usage:
-
-        # 1) Process .bib files to add OpenAlex IDs (specify your email):
-        poetry run alexify --email you@example.com process /path/to/bib/files --interactive
-
-        # 2) Fetch OpenAlex JSON records for the newly-created '-oa.bib' files:
-        poetry run alexify --email you@example.com fetch /path/to/bib/files -o /path/to/out
-
-        # 3) Show which entries lack any OpenAlex ID:
-        poetry run alexify missing /path/to/bib/files
-
-    Returns:
-        None
-
-    Raises:
-        SystemExit: If argparse encounters invalid options or missing parameters.
+    Hardening:
+      - Thorough argparse usage
+      - Basic logging setup
+      - Graceful handling of missing path
     """
 
     logging.basicConfig(
@@ -62,15 +38,14 @@ def main():
 Examples:
 
   1) Process .bib files to add OpenAlex IDs (using your email):
-     poetry run alexify --email you@example.com process /path/to/bib/files --interactive
+     alexify --email you@example.com process /path/to/bib/files --interactive
 
   2) Fetch OpenAlex JSON for processed .bib files:
-     poetry run alexify --email you@example.com fetch /path/to/bib/files -o /path/to/out
+     alexify --email you@example.com fetch /path/to/bib/files -o /path/to/out
 
   3) List entries missing OpenAlex IDs:
-     poetry run alexify missing /path/to/bib/files
+     alexify missing /path/to/bib/files
 """,
-        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
         "--email",
