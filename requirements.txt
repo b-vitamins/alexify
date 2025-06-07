@@ -1,0 +1,16 @@
+# Core dependencies
+bibtexparser==1.4.1
+fuzzywuzzy>=0.18.0,<0.19.0
+pyalex==0.13
+requests>=2.28.0,<3.0.0
+
+# Optional API dependencies (uncomment if needed)
+# httpx>=0.23.0,<1.0.0
+# pydantic>=1.9.0,<3.0.0
+# typing-extensions>=4.10,<5.0.0
+
+# Python-Levenshtein for better fuzzy matching performance
+python-Levenshtein>=0.12.0
+
+# For Python < 3.9 compatibility
+typing-extensions>=4.10,<5.0.0
