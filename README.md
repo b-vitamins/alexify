@@ -110,3 +110,10 @@ alexify missing /mybibfiles-oa.bib
 
 This project is licensed under the MIT License.
 
+## Development
+
+To set up a development environment with all dependencies and cached wheels, run
+`./setup-dev.sh` while online. The script installs required system packages,
+creates a Python virtual environment and runs the test suite to verify the
+setup.
+
