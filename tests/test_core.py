@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from alexify.core import (
@@ -452,15 +452,21 @@ def test_handle_fetch_success(m_fetch, m_load, mock_logger):
 ##########################
 
 
-@patch("alexify.search.pyalex.Works")
+@patch("alexify.search.httpx.Client")
 @patch("os.makedirs")
 @patch("os.path.exists", return_value=True)
 @patch("alexify.core.extract_year_from_filename", return_value=1987)
 @patch("builtins.open", new_callable=mock_open)
-def test__fetch_and_save_work_success(m_file, m_year, m_exists, m_makedirs, m_works):
+def test__fetch_and_save_work_success(m_file, m_year, m_exists, m_makedirs, m_client):
     from alexify.core import _fetch_and_save_work
 
-    m_works.return_value.__getitem__.return_value = {"id": "https://openalex.org/W123"}
+    # Mock the httpx response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"id": "https://openalex.org/W123"}
+    
+    mock_client_instance = m_client.return_value.__enter__.return_value
+    mock_client_instance.get.return_value = mock_response
 
     out = _fetch_and_save_work("W123", "/path/to/bib", "/outdir", True)
     assert out is True
@@ -473,32 +479,45 @@ def test__fetch_and_save_work_success(m_file, m_year, m_exists, m_makedirs, m_wo
     assert '"id": "https://openalex.org/W123"' in data
 
 
-@patch("alexify.search.pyalex.Works")
+@patch("alexify.search.httpx.Client")
 @patch("os.makedirs")
 @patch("os.path.exists", return_value=False)
 @patch("alexify.core.extract_year_from_filename", return_value=None)
 @patch("builtins.open", new_callable=mock_open)
 def test__fetch_and_save_work_unknown_year(
-    m_file, m_year, m_exists, m_makedirs, m_works
+    m_file, m_year, m_exists, m_makedirs, m_client
 ):
     from alexify.core import _fetch_and_save_work
 
-    m_works.return_value.__getitem__.return_value = {"id": "https://openalex.org/W999"}
+    # Mock the httpx response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"id": "https://openalex.org/W999"}
+    
+    mock_client_instance = m_client.return_value.__enter__.return_value
+    mock_client_instance.get.return_value = mock_response
     out = _fetch_and_save_work("W999", "/some/bib", "/outdir2", False)
     assert out is True
     m_makedirs.assert_called_once_with("/outdir2/unknown-year", exist_ok=True)
     m_file.assert_called_once_with("/outdir2/unknown-year/W999.json", "w")
 
 
-@patch("alexify.search.pyalex.Works", autospec=True)
+@patch("alexify.search.httpx.Client")
 @patch("os.path.exists", return_value=False)
 @patch("os.makedirs")
 def test__fetch_and_save_work_not_found(
-    m_makedirs, m_exists, m_works, mock_logger, tmp_path
+    m_makedirs, m_exists, m_client, mock_logger, tmp_path
 ):
     from alexify.core import _fetch_and_save_work
 
-    m_works.return_value.__getitem__.return_value = None
+    # Mock the httpx response to return None (404)
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_response.json.return_value = None
+    
+    mock_client_instance = m_client.return_value.__enter__.return_value
+    mock_client_instance.get.return_value = mock_response
+    
     # We'll choose a safe outdir => no permission error
     outdir = str(tmp_path / "safeout")
 

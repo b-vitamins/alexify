@@ -429,7 +429,8 @@ def _fetch_and_save_work(
       - If file already exists and not force => skip.
       - If anything fails => return False.
     """
-    from .search import pyalex
+    import httpx
+    from .search import _CONFIG, _make_request_with_retry
 
     fname = os.path.basename(bib_file)
     year = extract_year_from_filename(fname)
@@ -447,14 +448,23 @@ def _fetch_and_save_work(
         return False
 
     try:
-        res = pyalex.Works()[work_id]
-        if not res:
-            logger.warning(f"No Work found for {work_id}")
-            return False
-        with open(outpath, "w") as f:
-            json.dump(res, f, indent=2)
-        logger.info(f"Saved: {outpath}")
-        return True
+        # Fetch work from OpenAlex API
+        url = f"https://api.openalex.org/works/{work_id}"
+        params = {}
+        if _CONFIG["email"]:
+            params["mailto"] = _CONFIG["email"]
+        
+        with httpx.Client() as client:
+            data = _make_request_with_retry(client, url, params)
+            
+            if not data:
+                logger.warning(f"No Work found for {work_id}")
+                return False
+            
+            with open(outpath, "w") as f:
+                json.dump(data, f, indent=2)
+            logger.info(f"Saved: {outpath}")
+            return True
     except Exception as exc:
         logger.error(f"Failed fetching {work_id}: {exc}")
         return False

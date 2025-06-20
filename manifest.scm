@@ -1,9 +1,8 @@
 (specifications->manifest
   '("python"
     "python-pytest"
-    "python-requests"
+    "python-httpx"
     "python-fuzzywuzzy"
-    "python-pyalex"
     "python-bibtexparser-1"
     "python-beautifulsoup4"
     "python-pylatexenc"

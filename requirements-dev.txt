@@ -9,7 +9,7 @@ pytest-cov>=4.0.0
 # Type checking
 mypy>=1.0,<2.0
 pyright>=1.1.350
-types-requests
+types-httpx
 
 # Code quality
 ruff>=0.1.0,<0.2.0

@@ -10,8 +10,7 @@ license = "MIT"
 python = "^3.10"
 bibtexparser = "1.4.1"
 fuzzywuzzy = "^0.18.0"
-pyalex = "0.13"
-requests = "^2.28.0"
+httpx = "^0.23.0"
 
 [tool.poetry.scripts]
 alexify = "alexify.cli:main"
