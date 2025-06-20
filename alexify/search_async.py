@@ -53,7 +53,15 @@ async def _make_request_with_retry_async(
                     # Check for Retry-After header
                     retry_after = resp.headers.get("Retry-After")
                     if retry_after:
-                        wait_time = float(retry_after)
+                        try:
+                            # Try to parse as seconds (integer)
+                            wait_time = float(retry_after)
+                        except ValueError:
+                            # If it's a date string, use default backoff
+                            wait_time = _CONFIG["backoff"] * (2**attempt)
+                            logger.warning(
+                                f"Could not parse Retry-After header '{retry_after}', using default backoff"
+                            )
                         logger.warning(
                             f"Rate limited. Waiting {wait_time}s as requested by server"
                         )

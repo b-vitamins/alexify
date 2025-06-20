@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-01-20
+- Fix pickling error in concurrent processing by moving `compute_score` to module level
+- Fix Retry-After header parsing to handle both numeric and date string formats
+
 ## [0.4.0] - 2024-01-20
 - Add massive built-in concurrency support:
   - New `search_async.py` module with async/await implementations of all search functions

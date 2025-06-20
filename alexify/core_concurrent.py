@@ -84,6 +84,12 @@ async def process_bib_entries_by_dois_concurrent(
     return entries, changed
 
 
+def _compute_score_for_entry(args: Tuple[Dict[str, Any], Dict[str, Any]]) -> Tuple[float, Dict[str, Any]]:
+    """Top-level function for multiprocessing - must be pickleable."""
+    entry, candidate = args
+    return compute_overall_score(entry, candidate), candidate
+
+
 def score_candidates_concurrent(
     entry: Dict[str, Any], candidates: List[Dict[str, Any]]
 ) -> List[Tuple[float, Dict[str, Any]]]:
@@ -91,14 +97,14 @@ def score_candidates_concurrent(
     if not candidates:
         return []
 
-    def compute_score(candidate):
-        return compute_overall_score(entry, candidate), candidate
+    # Prepare arguments for multiprocessing
+    args_list = [(entry, candidate) for candidate in candidates]
 
     # Use ProcessPoolExecutor for CPU-intensive scoring
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=_CONCURRENT_CONFIG["max_scoring_workers"]
     ) as executor:
-        scored = list(executor.map(compute_score, candidates))
+        scored = list(executor.map(_compute_score_for_entry, args_list))
 
     return sorted(scored, reverse=True)
 
