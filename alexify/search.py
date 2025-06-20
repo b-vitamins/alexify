@@ -213,16 +213,21 @@ def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
                 continue
 
             piped = "|".join(valid_dois)
-            url = f"https://api.openalex.org/works?filter=doi:{piped}&per_page={batch_size}"
+            params = {"filter": f"doi:{piped}", "per_page": batch_size}
 
             # Add email if configured
             if _CONFIG["email"]:
-                url += f"&mailto={_CONFIG['email']}"
+                params["mailto"] = _CONFIG["email"]
 
             try:
-                resp = client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
+                data = _make_request_with_retry(
+                    client, "https://api.openalex.org/works", params=params
+                )
+                if not data or "results" not in data:
+                    logger.error(f"No results for batch {batch}")
+                    openalex_ids.extend(local_results)
+                    continue
+
                 results = data.get("results", [])
                 # Build a map from returned DOIs => short IDs
                 result_map = {}
@@ -243,8 +248,6 @@ def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
 
             except httpx.HTTPError as exc:
                 logger.error(f"Error fetching batch {batch}: {exc}")
-                # fill Nones for this batch
-                pass
             except Exception as exc:
                 logger.error(f"Unhandled error fetching batch {batch}: {exc}")
 

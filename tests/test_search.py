@@ -129,15 +129,13 @@ def test_fetch_openalex_works_by_dois_empty(mock_client):
     mock_client.assert_not_called()
 
 
+@patch("alexify.search._make_request_with_retry")
 @patch("alexify.search.httpx.Client", autospec=True)
-def test_fetch_openalex_works_by_dois_single_batch(mock_client):
+def test_fetch_openalex_works_by_dois_single_batch(_mock_client, mock_request):
     """
     If <50 DOIs => single request. Partial results => some found, some not => None.
     """
-    mock_sess = mock_client.return_value.__enter__.return_value
-    # Suppose the response only has one of them
-    mock_sess.get.return_value = resp = MagicMock()
-    resp.json.return_value = {
+    mock_request.return_value = {
         "results": [
             {"id": "https://openalex.org/W321", "doi": "https://doi.org/10.1234/foo"}
         ]
@@ -148,30 +146,27 @@ def test_fetch_openalex_works_by_dois_single_batch(mock_client):
     # We found foo => W321, bar => None
     assert res == ["W321", None]
 
-    # Check final URL
-    mock_sess.get.assert_called_once()
-    url_called = mock_sess.get.call_args[0][0]
-    # Must have "doi:https://doi.org/10.1234/foo|https://doi.org/10.1234/bar"
-    assert "doi:https://doi.org/10.1234/foo|https://doi.org/10.1234/bar" in url_called
+    mock_request.assert_called_once()
+    assert mock_request.call_args is not None
+    called_params = mock_request.call_args.kwargs.get("params", {})
+    assert (
+        called_params["filter"]
+        == "doi:https://doi.org/10.1234/foo|https://doi.org/10.1234/bar"
+    )
 
 
+@patch("alexify.search._make_request_with_retry")
 @patch("alexify.search.httpx.Client", autospec=True)
-def test_fetch_openalex_works_by_dois_multi_batches(mock_client):
+def test_fetch_openalex_works_by_dois_multi_batches(_mock_client, mock_request):
     """
     If we pass 100 DOIs => 2 calls, each with 50.
     """
     dois = [f"10.1234/test{i}" for i in range(100)]
-    mock_sess = mock_client.return_value.__enter__.return_value
-
-    # Build a side effect that returns partial results
-    def side(url):
-        resp = MagicMock()
-        resp.raise_for_status = MagicMock()
-        # For simplicity, let's say each batch returns 20 results
-        # We'll just return 20 IDs each time
+    def side(client, url, params=None):
+        assert params is not None
         results = []
-        if "test0" in url:
-            # First batch
+        filt = params["filter"]
+        if "test0" in filt:
             for i in range(20):
                 results.append(
                     {
@@ -179,8 +174,7 @@ def test_fetch_openalex_works_by_dois_multi_batches(mock_client):
                         "doi": f"https://doi.org/10.1234/test{i}",
                     }
                 )
-        elif "test50" in url:
-            # Second batch
+        elif "test50" in filt:
             for i in range(50, 70):
                 results.append(
                     {
@@ -188,10 +182,9 @@ def test_fetch_openalex_works_by_dois_multi_batches(mock_client):
                         "doi": f"https://doi.org/10.1234/test{i}",
                     }
                 )
-        resp.json.return_value = {"results": results}
-        return resp
+        return {"results": results}
 
-    mock_sess.get.side_effect = side
+    mock_request.side_effect = side
 
     res = fetch_openalex_works_by_dois(dois)
     assert len(res) == 100
@@ -207,34 +200,31 @@ def test_fetch_openalex_works_by_dois_multi_batches(mock_client):
     for i in range(70, 100):
         assert res[i] is None
 
-    assert mock_sess.get.call_count == 2
+    assert mock_request.call_count == 2
 
 
+@patch("alexify.search._make_request_with_retry")
 @patch("alexify.search.httpx.Client", autospec=True)
-def test_fetch_openalex_works_by_dois_partial_failure(mock_client, caplog):
+def test_fetch_openalex_works_by_dois_partial_failure(_mock_client, mock_request, caplog):
     """
     If one batch fails => that batch gets None, but others succeed.
     """
     dois = [f"10.1234/test{i}" for i in range(100)]
-    mock_sess = mock_client.return_value.__enter__.return_value
-
-    def side_effect(url):
-        if "test0" in url:
+    def side_effect(client, url, params=None):
+        assert params is not None
+        filt = params["filter"]
+        if "test0" in filt:
             raise httpx.HTTPError("Network error test")
-        else:
-            resp = MagicMock()
-            resp.raise_for_status = MagicMock()
-            resp.json.return_value = {
-                "results": [
-                    {
-                        "id": "https://openalex.org/W60",
-                        "doi": "https://doi.org/10.1234/test60",
-                    }
-                ]
-            }
-            return resp
+        return {
+            "results": [
+                {
+                    "id": "https://openalex.org/W60",
+                    "doi": "https://doi.org/10.1234/test60",
+                }
+            ]
+        }
 
-    mock_sess.get.side_effect = side_effect
+    mock_request.side_effect = side_effect
 
     with caplog.at_level(logging.ERROR):
         res = fetch_openalex_works_by_dois(dois)
@@ -251,3 +241,17 @@ def test_fetch_openalex_works_by_dois_partial_failure(mock_client, caplog):
             assert res[i] is None
 
     assert "Error fetching batch" in caplog.text
+
+
+@patch("alexify.search._make_request_with_retry")
+@patch("alexify.search.httpx.Client", autospec=True)
+def test_fetch_openalex_works_by_dois_no_results(_mock_client, mock_request, caplog):
+    """If API returns None or missing results, we log and return None values."""
+    dois = ["10.1111/abc", "10.2222/def"]
+    mock_request.return_value = None
+
+    with caplog.at_level(logging.ERROR):
+        res = fetch_openalex_works_by_dois(dois)
+
+    assert res == [None, None]
+    assert "No results for batch" in caplog.text
