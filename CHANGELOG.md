@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- Improve error handling in `fetch_openalex_works_by_dois` to use retry helper
+  and log when API returns no results. Update corresponding tests.
 
 ## [0.3.0]
 
