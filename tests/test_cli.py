@@ -23,7 +23,7 @@ def mock_logger(caplog):
 
 @patch("alexify.cli.find_bib_files", return_value=[])
 @patch("alexify.cli.sort_bib_files_by_year", return_value=[])
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 def test_cli_email_passed(mock_init, mock_sort, mock_find, monkeypatch):
     """
     Confirm we call init_pyalex_config with the passed email.
@@ -40,10 +40,10 @@ def test_cli_email_passed(mock_init, mock_sort, mock_find, monkeypatch):
 
 @patch("alexify.cli.find_bib_files", return_value=[])
 @patch("alexify.cli.sort_bib_files_by_year", return_value=[])
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 def test_cli_no_email(mock_init, mock_sort, mock_find, monkeypatch):
     """
-    Confirm we call init_pyalex_config with email=None when no --email arg is provided.
+    Confirm we call init_openalex_config with email=None when no --email arg is provided.
     """
     monkeypatch.setattr(sys, "argv", ["alexify", "process", "/some/path"])
     cli_main()
@@ -55,7 +55,7 @@ def test_cli_no_email(mock_init, mock_sort, mock_find, monkeypatch):
 #########################
 
 
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.handle_process")
 @patch("alexify.cli.find_bib_files")
 @patch("alexify.cli.sort_bib_files_by_year")
@@ -96,7 +96,7 @@ def test_cli_process_happy(
     mock_handle_process.assert_any_call("/file1.bib", True, True, True)
 
 
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.handle_fetch")
 @patch("alexify.cli.find_bib_files")
 @patch("alexify.cli.sort_bib_files_by_year")
@@ -128,7 +128,7 @@ def test_cli_fetch_happy(
     mock_handle_fetch.assert_any_call("/file1-oa.bib", "/outdir", True)
 
 
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.handle_missing")
 @patch("alexify.cli.find_bib_files")
 @patch("alexify.cli.sort_bib_files_by_year")
@@ -197,7 +197,7 @@ def test_cli_unknown_command(monkeypatch):
 #########################
 
 
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.find_bib_files", return_value=[])
 def test_cli_process_no_files_found(mock_find, mock_init, monkeypatch, caplog):
     """
@@ -214,7 +214,7 @@ def test_cli_process_no_files_found(mock_find, mock_init, monkeypatch, caplog):
     # We'll just confirm no error was raised.
 
 
-@patch("alexify.cli.init_pyalex_config")
+@patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.find_bib_files", return_value=["/somebib.bib"])
 @patch("alexify.cli.sort_bib_files_by_year", return_value=["/somebib.bib"])
 def test_cli_process_logs(mock_sort, mock_find, mock_init, monkeypatch, caplog):

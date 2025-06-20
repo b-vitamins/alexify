@@ -1,6 +1,6 @@
 # alexify/__init__.py
 
-__version__ = "0.1.0"
+__version__ = "0.4.0"
 
 # Import key functions for ease of use
 from .cli import main as cli_main
@@ -9,7 +9,7 @@ from .matching import fuzzy_match_authors, fuzzy_match_titles, normalize_text
 from .search import (
     fetch_openalex_works,
     fetch_openalex_works_by_dois,
-    init_pyalex_config,
+    init_openalex_config,
 )
 
 # Define what gets imported when using `from alexify import *`
@@ -24,6 +24,6 @@ __all__ = [
     "normalize_text",
     "fetch_openalex_works",
     "fetch_openalex_works_by_dois",
-    "init_pyalex_config",
+    "init_openalex_config",
     "cli_main",
 ]

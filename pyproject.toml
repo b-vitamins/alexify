@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "alexify"
-version = "0.3.0"
+version = "0.4.0"
 description = "CLI tool and Python library for adding OpenAlex metadata to BibTeX files."
 authors = ["Ayan Das <bvits@riseup.net>"]
 readme = "README.md"
@@ -10,7 +10,8 @@ license = "MIT"
 python = "^3.10"
 bibtexparser = "1.4.1"
 fuzzywuzzy = "^0.18.0"
-httpx = "^0.23.0"
+python-Levenshtein = "^0.12.0"
+httpx = {extras = ["http2"], version = "^0.23.0"}
 
 [tool.poetry.scripts]
 alexify = "alexify.cli:main"

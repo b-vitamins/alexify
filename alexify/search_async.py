@@ -1,12 +1,13 @@
+import asyncio
 import logging
-import time
 from typing import Any, Dict, List, Optional
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
-_SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+# Async cache for search results
+_ASYNC_SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
 
 # Configuration for OpenAlex API
 _CONFIG = {
@@ -14,39 +15,37 @@ _CONFIG = {
     "max_retries": 10,
     "backoff": 0.5,
     "retry_codes": [429, 500, 503],
-    "timeout": 30.0,  # Request timeout in seconds
+    "timeout": 30.0,
+    "max_concurrent_requests": 20,  # Maximum concurrent API requests
 }
 
 
-def init_openalex_config(
+def init_async_config(
     email: Optional[str] = None,
     max_retries: int = 10,
     backoff: float = 0.5,
     retry_codes: List[int] = [429, 500, 503],
     timeout: float = 30.0,
+    max_concurrent_requests: int = 20,
 ):
-    """
-    Initialize configuration parameters for OpenAlex API usage.
-    If `email` is provided, it will be added to API requests for polite pool access.
-    """
+    """Initialize configuration for async OpenAlex API usage."""
     _CONFIG["email"] = email
     _CONFIG["max_retries"] = max_retries
     _CONFIG["backoff"] = backoff
     _CONFIG["retry_codes"] = retry_codes
     _CONFIG["timeout"] = timeout
+    _CONFIG["max_concurrent_requests"] = max_concurrent_requests
 
 
-def _make_request_with_retry(
-    client: httpx.Client, url: str, params: Optional[Dict[str, Any]] = None
+async def _make_request_with_retry_async(
+    client: httpx.AsyncClient, url: str, params: Optional[Dict[str, Any]] = None
 ) -> Optional[dict]:
-    """
-    Make HTTP request with retry logic.
-    """
+    """Make async HTTP request with retry logic."""
     last_exception = None
 
     for attempt in range(_CONFIG["max_retries"]):
         try:
-            resp = client.get(url, params=params, timeout=_CONFIG["timeout"])
+            resp = await client.get(url, params=params, timeout=_CONFIG["timeout"])
 
             # Handle rate limiting and server errors
             if resp.status_code in _CONFIG["retry_codes"]:
@@ -64,7 +63,7 @@ def _make_request_with_retry(
                             f"HTTP {resp.status_code}. Retrying in {wait_time}s (attempt {attempt + 1}/{_CONFIG['max_retries']})"
                         )
 
-                    time.sleep(wait_time)
+                    await asyncio.sleep(wait_time)
                     continue
                 else:
                     logger.error(f"Max retries exceeded for {url}")
@@ -86,7 +85,7 @@ def _make_request_with_retry(
                 logger.warning(
                     f"Request timeout. Retrying in {wait_time}s (attempt {attempt + 1}/{_CONFIG['max_retries']})"
                 )
-                time.sleep(wait_time)
+                await asyncio.sleep(wait_time)
                 continue
             logger.error(
                 f"Request timeout after {_CONFIG['max_retries']} attempts: {exc}"
@@ -99,7 +98,7 @@ def _make_request_with_retry(
                 logger.warning(
                     f"HTTP error: {exc}. Retrying in {wait_time}s (attempt {attempt + 1}/{_CONFIG['max_retries']})"
                 )
-                time.sleep(wait_time)
+                await asyncio.sleep(wait_time)
                 continue
             logger.error(f"HTTP error after {_CONFIG['max_retries']} attempts: {exc}")
 
@@ -110,21 +109,18 @@ def _make_request_with_retry(
     return None
 
 
-def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
+async def fetch_openalex_works_async(
+    query: Optional[str], client: httpx.AsyncClient
+) -> List[Dict[str, Any]]:
     """
-    Search OpenAlex works for the given query string, caching results.
+    Async search OpenAlex works for the given query string, caching results.
     Returns a list of works (as dicts).
-
-    Hardening:
-      - If query is empty or None, return [] immediately.
-      - Cache results to avoid repeated calls for the same query.
-      - Catch HTTP errors => log & return [].
     """
     if not query or not isinstance(query, str):
         return []
 
-    if query in _SEARCH_CACHE:
-        return _SEARCH_CACHE[query]
+    if query in _ASYNC_SEARCH_CACHE:
+        return _ASYNC_SEARCH_CACHE[query]
 
     try:
         logger.debug(f"Searching OpenAlex for query: {query}")
@@ -137,36 +133,28 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
         if _CONFIG["email"]:
             params["mailto"] = _CONFIG["email"]
 
-        with httpx.Client() as client:
-            data = _make_request_with_retry(
-                client, "https://api.openalex.org/works", params=params
-            )
+        data = await _make_request_with_retry_async(
+            client, "https://api.openalex.org/works", params=params
+        )
 
-            if data and "results" in data:
-                works_list = data["results"]
-                _SEARCH_CACHE[query] = works_list
-                return works_list
-            return []
+        if data and "results" in data:
+            works_list = data["results"]
+            _ASYNC_SEARCH_CACHE[query] = works_list
+            return works_list
+        return []
 
     except Exception as exc:
         logger.error(f"Error searching OpenAlex for '{query}': {exc}")
         return []
 
 
-def fetch_all_candidates_for_entry(
-    title: str, authors_first_author_ln: str, year: str
+async def fetch_all_candidates_for_entry_async(
+    title: str, authors_first_author_ln: str, year: str, client: httpx.AsyncClient
 ) -> List[Dict[str, Any]]:
     """
+    Async version of fetch_all_candidates_for_entry.
     Given a BibTeX entry's title, first author lastname, and year, attempt
     to find all candidate Works from the OpenAlex API.
-
-    Heuristics:
-      - First try with all available components (title + author + year)
-      - If no results and we have year, try without year
-      - If still no results and we have author, try title only
-      - Otherwise => return [].
-
-    Returns a list of works (each a dict).
     """
     title_cleaned = title.replace("{", "").replace("}", "").strip() if title else ""
     author_cleaned = (
@@ -199,13 +187,15 @@ def fetch_all_candidates_for_entry(
     if title_cleaned and title_cleaned not in queries_to_try:
         queries_to_try.append(title_cleaned)
 
-    # Try each query strategy and collect all results
+    # Try each query strategy concurrently and collect all results
     all_results = []
     seen_ids = set()
 
-    for query in queries_to_try:
-        logger.debug(f"Trying query: {query}")
-        results = fetch_openalex_works(query)
+    # Execute queries concurrently
+    tasks = [fetch_openalex_works_async(query, client) for query in queries_to_try]
+    results_lists = await asyncio.gather(*tasks)
+
+    for query, results in zip(queries_to_try, results_lists):
         if results:
             logger.debug(f"Found {len(results)} results with query: {query}")
             # Add unique results
@@ -222,17 +212,18 @@ def fetch_all_candidates_for_entry(
     return all_results
 
 
-def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
+async def fetch_openalex_works_by_dois_async(
+    dois: List[str], client: httpx.AsyncClient
+) -> List[Optional[str]]:
     """
+    Async version of fetch_openalex_works_by_dois.
     Given a list of DOIs, return a list of corresponding OpenAlex IDs,
     or None for each DOI that could not be resolved.
 
-    Processes DOIs in batches of 50 (the API max).
+    Processes DOIs in batches concurrently.
     """
     if not dois:
         return []
-
-    openalex_ids = []
 
     # Preprocess DOIs to the format expected by OpenAlex
     processed_dois = []
@@ -246,20 +237,17 @@ def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
             processed_dois.append(None)
 
     batch_size = 50
+    openalex_ids = [None] * len(processed_dois)
 
-    with httpx.Client() as client:
-        for i in range(0, len(processed_dois), batch_size):
-            batch = processed_dois[i : i + batch_size]
+    # Create tasks for all batches
+    tasks = []
+    batch_indices = []
 
-            # For mapping results after fetch
-            local_results = [None] * len(batch)
+    for i in range(0, len(processed_dois), batch_size):
+        batch = processed_dois[i : i + batch_size]
+        valid_dois = [d for d in batch if d is not None]
 
-            # Build the filter portion
-            valid_dois = [d for d in batch if d is not None]
-            if not valid_dois:
-                openalex_ids.extend(local_results)
-                continue
-
+        if valid_dois:
             piped = "|".join(valid_dois)
             params = {"filter": f"doi:{piped}", "per_page": batch_size}
 
@@ -267,38 +255,78 @@ def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
             if _CONFIG["email"]:
                 params["mailto"] = _CONFIG["email"]
 
-            try:
-                data = _make_request_with_retry(
+            tasks.append(
+                _make_request_with_retry_async(
                     client, "https://api.openalex.org/works", params=params
                 )
-                if not data or "results" not in data:
-                    logger.error(f"No results for batch {batch}")
-                    openalex_ids.extend(local_results)
-                    continue
+            )
+            batch_indices.append((i, batch))
 
-                results = data.get("results", [])
-                # Build a map from returned DOIs => short IDs
-                result_map = {}
-                for w in results:
-                    if w.get("doi"):
-                        # Lowercase for consistency
-                        doi_key = w["doi"].lower()
-                        # Convert from "https://openalex.org/Wxxxx"
-                        short_id = w["id"].rsplit("/", 1)[-1]
-                        result_map[doi_key] = short_id
+    # Execute all batch requests concurrently
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                # For each doi in the batch, see if it is in result_map
-                for idx, doi_item in enumerate(batch):
-                    if doi_item is None:
-                        local_results[idx] = None
-                    else:
-                        local_results[idx] = result_map.get(doi_item.lower(), None)
+    # Process results
+    for (batch_start, batch), result in zip(batch_indices, results):
+        if isinstance(result, Exception):
+            logger.error(f"Error fetching batch starting at {batch_start}: {result}")
+            continue
 
-            except httpx.HTTPError as exc:
-                logger.error(f"Error fetching batch {batch}: {exc}")
-            except Exception as exc:
-                logger.error(f"Unhandled error fetching batch {batch}: {exc}")
+        if not result or "results" not in result:
+            logger.error(f"No results for batch starting at {batch_start}")
+            continue
 
-            openalex_ids.extend(local_results)
+        # Build a map from returned DOIs => short IDs
+        result_map = {}
+        for w in result.get("results", []):
+            if w.get("doi"):
+                # Lowercase for consistency
+                doi_key = w["doi"].lower()
+                # Convert from "https://openalex.org/Wxxxx"
+                short_id = w["id"].rsplit("/", 1)[-1]
+                result_map[doi_key] = short_id
+
+        # Map results back to original positions
+        for idx, doi_item in enumerate(batch):
+            if doi_item is not None:
+                openalex_ids[batch_start + idx] = result_map.get(doi_item.lower(), None)
 
     return openalex_ids
+
+
+# Semaphore for rate limiting concurrent requests
+_request_semaphore: Optional[asyncio.Semaphore] = None
+
+
+def get_request_semaphore() -> asyncio.Semaphore:
+    """Get or create the request semaphore for rate limiting."""
+    global _request_semaphore
+    if _request_semaphore is None:
+        _request_semaphore = asyncio.Semaphore(_CONFIG["max_concurrent_requests"])
+    return _request_semaphore
+
+
+async def fetch_work_details_async(
+    openalex_id: str, client: httpx.AsyncClient
+) -> Optional[Dict[str, Any]]:
+    """Fetch detailed work information for a single OpenAlex ID."""
+    url = f"https://api.openalex.org/works/{openalex_id}"
+
+    async with get_request_semaphore():
+        try:
+            params = {}
+            if _CONFIG["email"]:
+                params["mailto"] = _CONFIG["email"]
+
+            data = await _make_request_with_retry_async(client, url, params=params)
+            return data
+        except Exception as exc:
+            logger.error(f"Error fetching work {openalex_id}: {exc}")
+            return None
+
+
+async def fetch_multiple_works_async(
+    openalex_ids: List[str], client: httpx.AsyncClient
+) -> List[Optional[Dict[str, Any]]]:
+    """Fetch details for multiple OpenAlex IDs concurrently."""
+    tasks = [fetch_work_details_async(oid, client) for oid in openalex_ids]
+    return await asyncio.gather(*tasks)

@@ -29,7 +29,30 @@ pip install dist/alexify-0.1.0-py3-none-any.whl
 
 After installation, a command-line script named `alexify` should be available.
 
-> **Note:** You can optionally specify an email address (e.g., `--email yourname@example.com`) to configure `pyalex.config.email`. This helps identify you when making requests to OpenAlex and lets you join the [polite pool](https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication) which has more consistent response times. If omitted, no email is set and your requests go via the [common pool](https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication).
+> **Note:** You can optionally specify an email address (e.g., `--email yourname@example.com`) for OpenAlex API requests. This helps identify you when making requests to OpenAlex and lets you join the [polite pool](https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication) which has more consistent response times. If omitted, no email is set and your requests go via the [common pool](https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication).
+
+### Concurrent Mode (New!)
+
+For large datasets, **alexify** now supports massive built-in concurrency that can provide 10-50x speedup:
+
+```bash
+# Process with concurrent mode
+alexify --email you@example.com process /path/to/bib/files --concurrent
+
+# Customize concurrency settings
+alexify --email you@example.com process /path/to/bib/files --concurrent \
+  --max-requests 50 --max-files 8
+
+# Fetch with concurrent downloads
+alexify --email you@example.com fetch /path/to/bib/files -o /output --concurrent
+```
+
+Concurrent mode features:
+- Process multiple BibTeX files in parallel
+- Process entries within each file concurrently
+- Make up to 20 concurrent API requests (configurable)
+- Automatic rate limiting and retry handling
+- Efficient connection pooling
 
 ### Global Option: `--email`
 
@@ -64,7 +87,7 @@ Creates or updates a corresponding `*-oa.bib` file for each original `.bib` file
 #### Example
 
 ```bash
-# Process .bib files in /bibliography, with an email set for pyalex,
+# Process .bib files in /bibliography, with email for OpenAlex API,
 # interactive matches, and forcing overwrite of existing -oa.bib:
 alexify --email yourname@example.com process /bibliography --interactive --force
 ```

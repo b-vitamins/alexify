@@ -423,7 +423,7 @@ def _fetch_and_save_work(
     work_id: str, bib_file: str, out_dir: str, force: bool
 ) -> bool:
     """
-    Fetch a single work_id from OpenAlex using pyalex. Save as JSON.
+    Fetch a single work_id from OpenAlex API. Save as JSON.
 
     Hardening:
       - If file already exists and not force => skip.

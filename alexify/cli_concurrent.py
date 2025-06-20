@@ -1,13 +1,9 @@
+"""Enhanced CLI with massive concurrency support."""
+
 import argparse
 import logging
 
-from .core import (
-    find_bib_files,
-    handle_fetch,
-    handle_missing,
-    handle_process,
-    sort_bib_files_by_year,
-)
+from .core import find_bib_files, handle_missing, sort_bib_files_by_year
 from .core_concurrent import (
     init_concurrent_config,
     run_async_fetch,
@@ -18,17 +14,7 @@ from .search import init_openalex_config
 
 def main():
     """
-    Command-line entry point for 'alexify'.
-
-    Subcommands:
-      - process:  scans original .bib files, tries to find a matching OpenAlex ID
-      - fetch:    fetches JSON metadata from OpenAlex for matched entries
-      - missing:  lists which entries have not been matched
-
-    Hardening:
-      - Thorough argparse usage
-      - Basic logging setup
-      - Graceful handling of missing path
+    Enhanced command-line entry point for 'alexify' with concurrency support.
     """
 
     logging.basicConfig(
@@ -42,24 +28,21 @@ def main():
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     parser = argparse.ArgumentParser(
-        description="Process BibTeX files with OpenAlex data (alexify).",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Process BibTeX files with OpenAlex data (alexify) - Enhanced Concurrent Version",
         epilog="""
 Examples:
 
-  1) Process .bib files to add OpenAlex IDs (using your email):
-     alexify --email you@example.com process /path/to/bib/files --interactive
-
-  2) Process with massive concurrency (recommended for large datasets):
+  1) Process .bib files with massive concurrency:
      alexify --email you@example.com process /path/to/bib/files --concurrent
 
-  3) Fetch OpenAlex JSON for processed .bib files:
-     alexify --email you@example.com fetch /path/to/bib/files -o /path/to/out
+  2) Process with custom concurrency settings:
+     alexify --email you@example.com process /path/to/bib/files --concurrent \
+       --max-requests 50 --max-files 8 --max-entries 30
 
-  4) Fetch with concurrent downloads:
+  3) Fetch OpenAlex JSON with concurrent downloads:
      alexify --email you@example.com fetch /path/to/bib/files -o /path/to/out --concurrent
 
-  5) List entries missing OpenAlex IDs:
+  4) List entries missing OpenAlex IDs:
      alexify missing /path/to/bib/files
 """,
     )
@@ -86,7 +69,7 @@ Examples:
         action="store_true",
         help=(
             "Ask user about uncertain matches interactively. "
-            "If not set, titles above a certain threshold are auto-accepted."
+            "Note: Interactive mode is disabled when using --concurrent."
         ),
     )
     p_process.add_argument(
@@ -109,25 +92,25 @@ Examples:
         "--max-requests",
         type=int,
         default=20,
-        help="Maximum concurrent API requests when using --concurrent (default: 20).",
+        help="Maximum concurrent API requests (default: 20).",
     )
     p_process.add_argument(
         "--max-files",
         type=int,
         default=4,
-        help="Maximum files to process concurrently when using --concurrent (default: 4).",
+        help="Maximum files to process concurrently (default: 4).",
     )
     p_process.add_argument(
         "--max-entries",
         type=int,
         default=20,
-        help="Maximum entries to process concurrently per file when using --concurrent (default: 20).",
+        help="Maximum entries to process concurrently per file (default: 20).",
     )
     p_process.add_argument(
         "--batch-size",
         type=int,
         default=50,
-        help="Batch size for processing entries when using --concurrent (default: 50).",
+        help="Batch size for processing entries (default: 50).",
     )
 
     # Subcommand: fetch
@@ -159,7 +142,13 @@ Examples:
         "--max-requests",
         type=int,
         default=20,
-        help="Maximum concurrent API requests when using --concurrent (default: 20).",
+        help="Maximum concurrent API requests (default: 20).",
+    )
+    p_fetch.add_argument(
+        "--max-files",
+        type=int,
+        default=4,
+        help="Maximum files to process concurrently (default: 4).",
     )
 
     # Subcommand: missing
@@ -193,15 +182,17 @@ Examples:
             # Run with massive concurrency
             run_async_process(
                 sorted_files,
-                user_interaction=False,
+                user_interaction=False,  # Disable interaction in concurrent mode
                 force=args.force,
                 strict=args.strict,
                 email=args.email,
                 max_concurrent_requests=args.max_requests,
             )
         else:
-            # Initialize OpenAlex config for sequential processing
+            # Use original sequential processing
             init_openalex_config(email=args.email)
+            from .core import handle_process
+
             for bf in sorted_files:
                 handle_process(bf, args.interactive, args.force, args.strict)
 
@@ -209,11 +200,9 @@ Examples:
         files = find_bib_files(args.path, mode="processed")
         sorted_files = sort_bib_files_by_year(files)
 
-        if args.concurrent:
+        if hasattr(args, "concurrent") and args.concurrent:
             # Initialize concurrent configuration
-            init_concurrent_config(
-                max_file_workers=args.max_files if hasattr(args, "max_files") else 4
-            )
+            init_concurrent_config(max_file_workers=args.max_files)
 
             # Run with massive concurrency
             run_async_fetch(
@@ -224,14 +213,14 @@ Examples:
                 max_concurrent_requests=args.max_requests,
             )
         else:
-            # Initialize OpenAlex config for sequential processing
+            # Use original sequential processing
             init_openalex_config(email=args.email)
+            from .core import handle_fetch
+
             for bf in sorted_files:
                 handle_fetch(bf, args.output_dir, args.force)
 
     elif args.command == "missing":
-        # Initialize OpenAlex config
-        init_openalex_config(email=args.email)
         files = find_bib_files(args.path, mode="processed")
         sorted_files = sort_bib_files_by_year(files)
         for bf in sorted_files:

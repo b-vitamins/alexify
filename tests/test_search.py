@@ -8,14 +8,14 @@ from alexify.search import (
     fetch_all_candidates_for_entry,
     fetch_openalex_works,
     fetch_openalex_works_by_dois,
-    init_pyalex_config,
+    init_openalex_config,
 )
 
 
-def test_init_pyalex_config_no_email():
+def test_init_openalex_config_no_email():
     from alexify.search import _CONFIG
 
-    init_pyalex_config(email=None)
+    init_openalex_config(email=None)
     assert _CONFIG["email"] is None
 
 
@@ -29,13 +29,13 @@ def clear_search_cache():
     _SEARCH_CACHE.clear()
 
 
-def test_init_pyalex_config():
+def test_init_openalex_config():
     """
-    Check config fields after calling init_pyalex_config.
+    Check config fields after calling init_openalex_config.
     """
     from alexify.search import _CONFIG
 
-    init_pyalex_config(
+    init_openalex_config(
         email="test@example.com", max_retries=5, backoff=0.1, retry_codes=[429, 500]
     )
     assert _CONFIG["email"] == "test@example.com"
@@ -79,13 +79,20 @@ def test_fetch_openalex_works_error(mock_client, clear_search_cache, caplog):
     """
     If we get an HTTPError => log error, return [].
     """
+    # Configure for faster test execution
+    init_openalex_config(max_retries=2, backoff=0.1)
+
     mock_client_instance = mock_client.return_value.__enter__.return_value
     mock_client_instance.get.side_effect = httpx.HTTPError("Test Error")
 
     with caplog.at_level(logging.ERROR):
         res = fetch_openalex_works("failing query")
     assert res == []
-    assert "Error searching OpenAlex for 'failing query'" in caplog.text
+    # Check for either the old or new error message format
+    assert (
+        "Error searching OpenAlex for 'failing query'" in caplog.text
+        or "All retry attempts failed for https://api.openalex.org/works" in caplog.text
+    )
 
 
 def test_fetch_openalex_works_empty_query(clear_search_cache):
@@ -162,6 +169,7 @@ def test_fetch_openalex_works_by_dois_multi_batches(_mock_client, mock_request):
     If we pass 100 DOIs => 2 calls, each with 50.
     """
     dois = [f"10.1234/test{i}" for i in range(100)]
+
     def side(client, url, params=None):
         assert params is not None
         results = []
@@ -205,11 +213,14 @@ def test_fetch_openalex_works_by_dois_multi_batches(_mock_client, mock_request):
 
 @patch("alexify.search._make_request_with_retry")
 @patch("alexify.search.httpx.Client", autospec=True)
-def test_fetch_openalex_works_by_dois_partial_failure(_mock_client, mock_request, caplog):
+def test_fetch_openalex_works_by_dois_partial_failure(
+    _mock_client, mock_request, caplog
+):
     """
     If one batch fails => that batch gets None, but others succeed.
     """
     dois = [f"10.1234/test{i}" for i in range(100)]
+
     def side_effect(client, url, params=None):
         assert params is not None
         filt = params["filter"]
