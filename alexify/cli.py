@@ -32,6 +32,10 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    # Silence verbose HTTPX logs from showing request/response details
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     parser = argparse.ArgumentParser(
         description="Process BibTeX files with OpenAlex data (alexify).",
         epilog="""
