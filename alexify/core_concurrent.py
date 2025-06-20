@@ -106,7 +106,8 @@ def score_candidates_concurrent(
     ) as executor:
         scored = list(executor.map(_compute_score_for_entry, args_list))
 
-    return sorted(scored, reverse=True)
+    # Sort by score only; avoid comparing dicts when scores tie
+    return sorted(scored, key=lambda x: x[0], reverse=True)
 
 
 async def process_bib_entry_by_title_async(

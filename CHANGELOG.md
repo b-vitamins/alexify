@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Avoid TypeError when candidate scores tie in concurrent scoring
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats
