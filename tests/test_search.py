@@ -14,7 +14,7 @@ from alexify.search import (
 
 def test_init_pyalex_config_no_email():
     from alexify.search import _CONFIG
-    
+
     init_pyalex_config(email=None)
     assert _CONFIG["email"] is None
 
@@ -34,7 +34,7 @@ def test_init_pyalex_config():
     Check config fields after calling init_pyalex_config.
     """
     from alexify.search import _CONFIG
-    
+
     init_pyalex_config(
         email="test@example.com", max_retries=5, backoff=0.1, retry_codes=[429, 500]
     )
@@ -58,7 +58,7 @@ def test_fetch_openalex_works_simple(mock_client, clear_search_cache):
             {"id": "https://openalex.org/W999", "title": "Sample 2"},
         ]
     }
-    
+
     mock_client_instance = mock_client.return_value.__enter__.return_value
     mock_client_instance.get.return_value = mock_response
 
@@ -110,6 +110,10 @@ def test_fetch_all_candidates_for_entry():
     res2 = fetch_all_candidates_for_entry("Title XYZ", "", "2021")
     # Title only
     res3 = fetch_all_candidates_for_entry("Only Title", "", "")
+    # Ensure intermediate queries return lists (could be empty if no network)
+    assert isinstance(res, list)
+    assert isinstance(res2, list)
+    assert isinstance(res3, list)
     # Nothing => []
     res4 = fetch_all_candidates_for_entry("", "", "")
     assert res4 == []
@@ -222,7 +226,10 @@ def test_fetch_openalex_works_by_dois_partial_failure(mock_client, caplog):
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {
                 "results": [
-                    {"id": "https://openalex.org/W60", "doi": "https://doi.org/10.1234/test60"}
+                    {
+                        "id": "https://openalex.org/W60",
+                        "doi": "https://doi.org/10.1234/test60",
+                    }
                 ]
             }
             return resp

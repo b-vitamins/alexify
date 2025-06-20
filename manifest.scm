@@ -6,4 +6,6 @@
     "python-bibtexparser-1"
     "python-beautifulsoup4"
     "python-pylatexenc"
-    "python-grobid-client-python"))
+    "python-grobid-client-python"
+    "python-ruff"
+    "node-pyright"))

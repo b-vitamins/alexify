@@ -46,7 +46,7 @@ def save_bib_file(bib_path: str, bib_db: bibtexparser.bibdatabase.BibDatabase) -
 
     writer = BibTexWriter()
     writer.indent = "  "
-    writer.order_entries_by = None
+    writer.order_entries_by = ("ID",)
 
     try:
         with open(bib_path, "w") as out:
@@ -453,14 +453,14 @@ def _fetch_and_save_work(
         params = {}
         if _CONFIG["email"]:
             params["mailto"] = _CONFIG["email"]
-        
+
         with httpx.Client() as client:
             data = _make_request_with_retry(client, url, params)
-            
+
             if not data:
                 logger.warning(f"No Work found for {work_id}")
                 return False
-            
+
             with open(outpath, "w") as f:
                 json.dump(data, f, indent=2)
             logger.info(f"Saved: {outpath}")

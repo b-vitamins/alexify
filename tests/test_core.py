@@ -464,7 +464,7 @@ def test__fetch_and_save_work_success(m_file, m_year, m_exists, m_makedirs, m_cl
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"id": "https://openalex.org/W123"}
-    
+
     mock_client_instance = m_client.return_value.__enter__.return_value
     mock_client_instance.get.return_value = mock_response
 
@@ -493,7 +493,7 @@ def test__fetch_and_save_work_unknown_year(
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"id": "https://openalex.org/W999"}
-    
+
     mock_client_instance = m_client.return_value.__enter__.return_value
     mock_client_instance.get.return_value = mock_response
     out = _fetch_and_save_work("W999", "/some/bib", "/outdir2", False)
@@ -514,10 +514,10 @@ def test__fetch_and_save_work_not_found(
     mock_response = MagicMock()
     mock_response.status_code = 404
     mock_response.json.return_value = None
-    
+
     mock_client_instance = m_client.return_value.__enter__.return_value
     mock_client_instance.get.return_value = mock_response
-    
+
     # We'll choose a safe outdir => no permission error
     outdir = str(tmp_path / "safeout")
 
