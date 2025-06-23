@@ -87,6 +87,30 @@ def fuzzy_match_titles(
       - Check for empty or None input => score 0.
       - Guard around fuzzywuzzy calls with try/except to avoid edge-case crashes.
     """
+    # Type validation for critical parameters
+    if weight_token is not None and not isinstance(weight_token, (int, float)):
+        logger.warning(
+            f"Invalid weight_token type: {type(weight_token)}, using default"
+        )
+        weight_token = 0.7
+
+    if weight_partial is not None and not isinstance(weight_partial, (int, float)):
+        logger.warning(
+            f"Invalid weight_partial type: {type(weight_partial)}, using default"
+        )
+        weight_partial = 0.3
+
+    # Validate weight bounds
+    if not (0.0 <= weight_token <= 1.0):
+        logger.warning(f"Invalid weight_token value: {weight_token}, clamping to [0,1]")
+        weight_token = max(0.0, min(1.0, weight_token))
+
+    if not (0.0 <= weight_partial <= 1.0):
+        logger.warning(
+            f"Invalid weight_partial value: {weight_partial}, clamping to [0,1]"
+        )
+        weight_partial = max(0.0, min(1.0, weight_partial))
+
     if not title1 or not title2:
         return 0.0
 
@@ -280,6 +304,28 @@ def fuzzy_match_authors(
       - If either list is empty => 0.0
       - Protective try/except on name matching
     """
+    # Type validation for critical parameters
+    if not isinstance(bibtex_authors, list):
+        logger.warning(
+            f"Invalid bibtex_authors type: {type(bibtex_authors)}, expected list"
+        )
+        return 0.0
+
+    if not isinstance(openalex_authors, list):
+        logger.warning(
+            f"Invalid openalex_authors type: {type(openalex_authors)}, expected list"
+        )
+        return 0.0
+
+    if not isinstance(threshold, (int, float)):
+        logger.warning(f"Invalid threshold type: {type(threshold)}, using default")
+        threshold = 70.0
+
+    # Validate threshold bounds
+    if not (0.0 <= threshold <= 100.0):
+        logger.warning(f"Invalid threshold value: {threshold}, clamping to [0,100]")
+        threshold = max(0.0, min(100.0, threshold))
+
     if not bibtex_authors or not openalex_authors:
         return 0.0
 

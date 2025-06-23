@@ -22,6 +22,21 @@
 - **Input Validation**: Add parameter validation to prevent silent failures
 - **Error Messaging**: Improve error messages with more context and specificity
 
+### Input Validation & Security
+- **CLI Argument Validation**: Comprehensive validation of command-line inputs
+  - Add email format validation using regex patterns for `--email` arguments
+  - Add numeric bounds checking for concurrency parameters (max-requests, max-files, max-entries, batch-size)
+  - Add path existence and permission validation for input/output directories
+  - Automatic output directory creation with proper error handling
+- **API Response Validation**: Add structure validation for OpenAlex API responses
+  - Validate response format and required fields (`results`, `id`, `title`)
+  - Detect malformed API responses and handle gracefully with informative logging
+  - Replace basic structure checks with comprehensive validation functions
+- **Runtime Type Checking**: Add type validation to critical functions
+  - Parameter type validation in fuzzy matching functions with fallback defaults
+  - Bounds checking for weight parameters and thresholds with automatic clamping
+  - Input type validation for author lists and other critical data structures
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats

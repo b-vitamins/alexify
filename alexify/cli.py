@@ -1,5 +1,8 @@
 import argparse
 import logging
+import os
+import re
+import sys
 
 from .core import (
     find_bib_files,
@@ -14,6 +17,57 @@ from .core_concurrent import (
     run_async_process,
 )
 from .search import init_openalex_config
+
+
+def validate_email(email: str) -> bool:
+    """
+    Validate email format using a basic regex pattern.
+    Returns True if email is valid, False otherwise.
+    """
+    if not email or not isinstance(email, str):
+        return False
+
+    # Basic email validation pattern
+    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    return re.match(email_pattern, email.strip()) is not None
+
+
+def validate_numeric_bounds(
+    value: int, param_name: str, min_val: int, max_val: int
+) -> None:
+    """
+    Validate that a numeric parameter is within acceptable bounds.
+    Exits with error message if validation fails.
+    """
+    if not isinstance(value, int) or value < min_val or value > max_val:
+        logging.error(
+            f"Invalid {param_name}: {value}. Must be between {min_val} and {max_val}."
+        )
+        sys.exit(1)
+
+
+def validate_path_access(
+    path: str, require_readable: bool = True, require_writable: bool = False
+) -> None:
+    """
+    Validate that a path exists and has required permissions.
+    Exits with error message if validation fails.
+    """
+    if not path or not isinstance(path, str):
+        logging.error("Path must be a non-empty string.")
+        sys.exit(1)
+
+    if not os.path.exists(path):
+        logging.error(f"Path does not exist: {path}")
+        sys.exit(1)
+
+    if require_readable and not os.access(path, os.R_OK):
+        logging.error(f"Path is not readable: {path}")
+        sys.exit(1)
+
+    if require_writable and not os.access(path, os.W_OK):
+        logging.error(f"Path is not writable: {path}")
+        sys.exit(1)
 
 
 def main():
@@ -171,6 +225,41 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Validate email format if provided
+    if args.email and not validate_email(args.email):
+        logging.error(
+            f"Invalid email format: '{args.email}'. Please provide a valid email address."
+        )
+        sys.exit(1)
+
+    # Validate paths based on command
+    if args.command in ["process", "fetch", "missing"]:
+        validate_path_access(args.path, require_readable=True)
+
+    if args.command == "fetch":
+        # For fetch command, validate output directory
+        if not os.path.exists(args.output_dir):
+            # Try to create the output directory if it doesn't exist
+            try:
+                os.makedirs(args.output_dir, exist_ok=True)
+                logging.info(f"Created output directory: {args.output_dir}")
+            except (OSError, PermissionError) as e:
+                logging.error(
+                    f"Cannot create output directory '{args.output_dir}': {e}"
+                )
+                sys.exit(1)
+        else:
+            validate_path_access(
+                args.output_dir, require_readable=True, require_writable=True
+            )
+
+    # Validate concurrent processing parameters if using concurrent mode
+    if hasattr(args, "concurrent") and args.concurrent:
+        validate_numeric_bounds(args.max_requests, "max-requests", 1, 100)
+        validate_numeric_bounds(args.max_files, "max-files", 1, 20)
+        validate_numeric_bounds(args.max_entries, "max-entries", 1, 100)
+        validate_numeric_bounds(args.batch_size, "batch-size", 1, 1000)
 
     if args.command == "process":
         files = find_bib_files(args.path, mode="original")

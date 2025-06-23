@@ -268,4 +268,4 @@ def test_fetch_openalex_works_by_dois_no_results(_mock_client, mock_request, cap
         res = fetch_openalex_works_by_dois(dois)
 
     assert res == [None, None]
-    assert "No results for batch" in caplog.text
+    assert "Invalid or no results for batch" in caplog.text

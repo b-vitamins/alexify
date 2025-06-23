@@ -21,10 +21,13 @@ def mock_logger(caplog):
 #########################
 
 
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.find_bib_files", return_value=[])
 @patch("alexify.cli.sort_bib_files_by_year", return_value=[])
 @patch("alexify.cli.init_openalex_config")
-def test_cli_email_passed(mock_init, mock_sort, mock_find, monkeypatch):
+def test_cli_email_passed(
+    mock_init, mock_sort, mock_find, mock_validate_path, monkeypatch
+):
     """
     Confirm we call init_pyalex_config with the passed email.
     """
@@ -38,10 +41,11 @@ def test_cli_email_passed(mock_init, mock_sort, mock_find, monkeypatch):
     mock_init.assert_called_once_with(email="tester@example.com")
 
 
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.find_bib_files", return_value=[])
 @patch("alexify.cli.sort_bib_files_by_year", return_value=[])
 @patch("alexify.cli.init_openalex_config")
-def test_cli_no_email(mock_init, mock_sort, mock_find, monkeypatch):
+def test_cli_no_email(mock_init, mock_sort, mock_find, mock_validate_path, monkeypatch):
     """
     Confirm we call init_openalex_config with email=None when no --email arg is provided.
     """
@@ -55,12 +59,19 @@ def test_cli_no_email(mock_init, mock_sort, mock_find, monkeypatch):
 #########################
 
 
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.handle_process")
 @patch("alexify.cli.find_bib_files")
 @patch("alexify.cli.sort_bib_files_by_year")
 def test_cli_process_happy(
-    mock_sort, mock_find, mock_handle_process, mock_init, monkeypatch, mock_logger
+    mock_sort,
+    mock_find,
+    mock_handle_process,
+    mock_init,
+    mock_validate_path,
+    monkeypatch,
+    mock_logger,
 ):
     """
     Command:
@@ -96,12 +107,20 @@ def test_cli_process_happy(
     mock_handle_process.assert_any_call("/file1.bib", True, True, True)
 
 
+@patch("os.makedirs")
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.handle_fetch")
 @patch("alexify.cli.find_bib_files")
 @patch("alexify.cli.sort_bib_files_by_year")
 def test_cli_fetch_happy(
-    mock_sort, mock_find, mock_handle_fetch, mock_init, monkeypatch
+    mock_sort,
+    mock_find,
+    mock_handle_fetch,
+    mock_init,
+    mock_validate_path,
+    mock_makedirs,
+    monkeypatch,
 ):
     """
     Command:
@@ -128,12 +147,18 @@ def test_cli_fetch_happy(
     mock_handle_fetch.assert_any_call("/file1-oa.bib", "/outdir", True)
 
 
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.handle_missing")
 @patch("alexify.cli.find_bib_files")
 @patch("alexify.cli.sort_bib_files_by_year")
 def test_cli_missing_happy(
-    mock_sort, mock_find, mock_handle_missing, mock_init, monkeypatch
+    mock_sort,
+    mock_find,
+    mock_handle_missing,
+    mock_init,
+    mock_validate_path,
+    monkeypatch,
 ):
     """
     Command:
@@ -197,9 +222,12 @@ def test_cli_unknown_command(monkeypatch):
 #########################
 
 
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.find_bib_files", return_value=[])
-def test_cli_process_no_files_found(mock_find, mock_init, monkeypatch, caplog):
+def test_cli_process_no_files_found(
+    mock_validate_path, mock_find, mock_init, monkeypatch, caplog
+):
     """
     If find_bib_files returns empty => handle_process never called => just logs
     """
@@ -214,10 +242,13 @@ def test_cli_process_no_files_found(mock_find, mock_init, monkeypatch, caplog):
     # We'll just confirm no error was raised.
 
 
+@patch("alexify.cli.validate_path_access")
 @patch("alexify.cli.init_openalex_config")
 @patch("alexify.cli.find_bib_files", return_value=["/somebib.bib"])
 @patch("alexify.cli.sort_bib_files_by_year", return_value=["/somebib.bib"])
-def test_cli_process_logs(mock_sort, mock_find, mock_init, monkeypatch, caplog):
+def test_cli_process_logs(
+    mock_validate_path, mock_sort, mock_find, mock_init, monkeypatch, caplog
+):
     """
     Check that with a single .bib, we call handle_process once and log at INFO level.
     """

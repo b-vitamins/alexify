@@ -7,6 +7,43 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
+def validate_openalex_response(data: Any, endpoint_type: str = "works") -> bool:
+    """
+    Validate OpenAlex API response structure.
+    Returns True if response is valid, False otherwise.
+    """
+    if not data or not isinstance(data, dict):
+        logger.warning(f"Invalid {endpoint_type} response: not a dictionary")
+        return False
+
+    # Check for required top-level fields
+    if "results" not in data:
+        logger.warning(f"Invalid {endpoint_type} response: missing 'results' field")
+        return False
+
+    if not isinstance(data["results"], list):
+        logger.warning(f"Invalid {endpoint_type} response: 'results' is not a list")
+        return False
+
+    # Validate individual work entries if present
+    if endpoint_type == "works" and data["results"]:
+        for i, work in enumerate(data["results"][:5]):  # Check first 5 entries
+            if not isinstance(work, dict):
+                logger.warning(f"Invalid work entry {i}: not a dictionary")
+                continue
+
+            # Check for essential work fields
+            if "id" not in work:
+                logger.warning(f"Work entry {i} missing 'id' field")
+                continue
+
+            if "title" not in work:
+                logger.warning(f"Work entry {i} missing 'title' field")
+
+    return True
+
+
 # Thread-safe cache for search results
 _SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -155,7 +192,7 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
                 client, "https://api.openalex.org/works", params=params
             )
 
-            if data and "results" in data:
+            if data and validate_openalex_response(data, "works"):
                 works_list = data["results"]
                 # Update cache with lock protection
                 with _CACHE_LOCK:
@@ -289,8 +326,8 @@ def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
                 data = _make_request_with_retry(
                     client, "https://api.openalex.org/works", params=params
                 )
-                if not data or "results" not in data:
-                    logger.error(f"No results for batch {batch}")
+                if not data or not validate_openalex_response(data, "works"):
+                    logger.error(f"Invalid or no results for batch {batch}")
                     openalex_ids.extend(local_results)
                     continue
 
