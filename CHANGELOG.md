@@ -74,6 +74,25 @@
   - `@validate_input` for consistent input validation across functions
   - `@log_performance` and `@log_async_performance` for execution time logging
 
+### Logging Consistency & Standardization
+- **Standardized Logger Creation**: Ensure consistent logger creation patterns across all modules
+  - Fix `core.py` to use `logging.getLogger(__name__)` instead of hardcoded module name
+  - Add logger to `query_builder.py` for debugging and traceability
+  - Establish standard `logger = logging.getLogger(__name__)` pattern across all modules
+- **Centralized Logging Configuration**: Create unified logging management system
+  - New `logging_config.py` module with `setup_logging()`, `set_debug_mode()`, and configuration utilities
+  - Automatic suppression of verbose external library logs (httpx, httpcore, urllib3)
+  - Performance logging capabilities with dedicated formatters and handlers
+  - Support for runtime log level adjustment and external library suppression
+- **Optimized Log Levels**: Adjust log levels for better operational visibility
+  - Promote key search operations from DEBUG to INFO level for better user feedback
+  - Standardize progression: DEBUG (diagnostic details) → INFO (operations) → WARNING (recoverable) → ERROR (failures)
+  - Enhanced progress logging with timing information for long-running concurrent operations
+- **Enhanced Progress Reporting**: Add comprehensive progress logging to concurrent operations
+  - Processing time measurement and throughput reporting (entries/second)
+  - Batch processing progress updates with completion percentages
+  - Detailed timing information for performance monitoring and optimization
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats

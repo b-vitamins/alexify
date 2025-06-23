@@ -213,7 +213,7 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
         return cached_result
 
     try:
-        logger.debug(f"Searching OpenAlex for query: {query}")
+        logger.info(f"Searching OpenAlex for query: {query}")
 
         # Build parameters
         params = {
@@ -294,10 +294,10 @@ def fetch_all_candidates_for_entry(
     seen_ids = set()
 
     for query in queries_to_try:
-        logger.debug(f"Trying query: {query}")
+        logger.info(f"Trying query: {query}")
         results = fetch_openalex_works(query)
         if results:
-            logger.debug(f"Found {len(results)} results with query: {query}")
+            logger.info(f"Found {len(results)} results with query: {query}")
             # Add unique results
             for result in results:
                 work_id = result.get("id")
@@ -308,7 +308,7 @@ def fetch_all_candidates_for_entry(
             if len(all_results) >= 10 and query == title_cleaned:
                 break
 
-    logger.debug(f"Total unique results collected: {len(all_results)}")
+    logger.info(f"Total unique results collected: {len(all_results)}")
     return all_results
 
 

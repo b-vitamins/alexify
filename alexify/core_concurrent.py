@@ -228,7 +228,10 @@ async def handle_process_concurrent(
     Enhanced concurrent version of handle_process.
     Processes entries in batches with massive parallelization.
     """
-    logger.info(f"Processing {bib_file} with concurrent mode...")
+    import time
+
+    start_time = time.time()
+    logger.info(f"Starting concurrent processing of {bib_file}...")
 
     # Check if already processed
     outfile = bib_file.replace(".bib", "-oa.bib")
@@ -290,7 +293,12 @@ async def handle_process_concurrent(
     logger.info(f"Matched {matched_total}/{total} entries")
 
     save_bib_file(outfile, db)
-    logger.info(f"Saved to {outfile}")
+    processing_time = time.time() - start_time
+    logger.info(
+        f"Concurrent processing complete: saved to {outfile}. "
+        f"Matched {matched_total}/{total} entries in {processing_time:.2f}s "
+        f"({total / processing_time:.1f} entries/sec)"
+    )
 
 
 async def handle_fetch_concurrent(

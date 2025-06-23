@@ -207,7 +207,7 @@ async def fetch_openalex_works_async(
         return cached_result
 
     try:
-        logger.debug(f"Searching OpenAlex for query: {query}")
+        logger.info(f"Searching OpenAlex for query: {query}")
 
         # Build parameters
         params = {
@@ -285,7 +285,7 @@ async def fetch_all_candidates_for_entry_async(
 
     for query, results in zip(queries_to_try, results_lists):
         if results:
-            logger.debug(f"Found {len(results)} results with query: {query}")
+            logger.info(f"Found {len(results)} results with query: {query}")
             # Add unique results
             for result in results:
                 work_id = result.get("id")
@@ -296,7 +296,7 @@ async def fetch_all_candidates_for_entry_async(
             if len(all_results) >= 10 and query == title_cleaned:
                 break
 
-    logger.debug(f"Total unique results collected: {len(all_results)}")
+    logger.info(f"Total unique results collected: {len(all_results)}")
     return all_results
 
 

@@ -10,7 +10,7 @@ from bibtexparser.bparser import BibTexParser
 
 from .search import fetch_openalex_works_by_dois
 
-logger = logging.getLogger("alexify.core")
+logger = logging.getLogger(__name__)
 
 
 def load_bib_file(bib_path: str) -> Optional[bibtexparser.bibdatabase.BibDatabase]:
