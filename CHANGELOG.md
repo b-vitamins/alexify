@@ -51,6 +51,29 @@
   - Reduced computational overhead for large author lists
   - Maintain same matching accuracy with improved speed
 
+### Code Organization & Duplication Elimination
+- **Unified CLI Interface**: Consolidate `cli.py` and `cli_concurrent.py` into single interface
+  - Remove duplicate CLI file and merge functionality into main CLI
+  - Add missing `--max-files` argument to fetch command for consistency
+  - Maintain backward compatibility for all existing commands and options
+- **HTTP Client Base Classes**: Extract common HTTP request handling into reusable components
+  - Create `BaseHTTPClient` abstract class with shared retry logic and configuration
+  - Implement `SyncHTTPClient` and `AsyncHTTPClient` subclasses for sync/async operations
+  - Eliminate code duplication between `search.py` and `search_async.py` modules
+- **Unified Configuration Management**: Centralize configuration handling across modules
+  - Thread-safe `ConfigManager` class with centralized configuration storage
+  - Unified configuration interface with `get_config()`, `init_config()`, and `set_config_value()` functions
+  - Replace scattered global configuration variables with single source of truth
+- **OpenAlex Query Builder**: Extract query building logic into reusable utility
+  - `OpenAlexQueryBuilder` class with static methods for building search queries
+  - Support for search parameters, DOI filters, and work detail parameters
+  - Consistent query building patterns across sync and async modules
+- **Error Handling Decorators**: Create reusable decorators for common error patterns
+  - `@handle_http_errors` and `@handle_async_http_errors` for HTTP request error handling
+  - `@handle_file_errors` for file operation error handling
+  - `@validate_input` for consistent input validation across functions
+  - `@log_performance` and `@log_async_performance` for execution time logging
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats

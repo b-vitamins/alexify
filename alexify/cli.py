@@ -215,6 +215,12 @@ Examples:
         default=20,
         help="Maximum concurrent API requests when using --concurrent (default: 20).",
     )
+    p_fetch.add_argument(
+        "--max-files",
+        type=int,
+        default=4,
+        help="Maximum files to process concurrently when using --concurrent (default: 4).",
+    )
 
     # Subcommand: missing
     p_missing = sub.add_parser(
@@ -300,9 +306,7 @@ Examples:
 
         if args.concurrent:
             # Initialize concurrent configuration
-            init_concurrent_config(
-                max_file_workers=args.max_files if hasattr(args, "max_files") else 4
-            )
+            init_concurrent_config(max_file_workers=args.max_files)
 
             # Run with massive concurrency
             run_async_fetch(
