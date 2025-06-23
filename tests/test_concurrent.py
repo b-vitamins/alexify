@@ -225,6 +225,6 @@ async def test_multiple_works_fetch():
     results = await fetch_multiple_works_async(["W1234", "W5678", "W9999"], mock_client)
 
     assert len(results) == 3
-    assert results[0]["title"] == "Paper 1"
-    assert results[1]["title"] == "Paper 2"
+    assert results[0] is not None and results[0]["title"] == "Paper 1"
+    assert results[1] is not None and results[1]["title"] == "Paper 2"
     assert results[2] is None

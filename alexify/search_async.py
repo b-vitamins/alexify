@@ -156,8 +156,11 @@ async def fetch_openalex_works_async(
             return works_list
         return []
 
+    except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+        logger.error(f"HTTP error searching OpenAlex for '{query}': {exc}")
+        return []
     except Exception as exc:
-        logger.error(f"Error searching OpenAlex for '{query}': {exc}")
+        logger.error(f"Unexpected error searching OpenAlex for '{query}': {exc}")
         return []
 
 
@@ -338,8 +341,11 @@ async def fetch_work_details_async(
 
             data = await _make_request_with_retry_async(client, url, params=params)
             return data
+        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+            logger.error(f"HTTP error fetching work {openalex_id}: {exc}")
+            return None
         except Exception as exc:
-            logger.error(f"Error fetching work {openalex_id}: {exc}")
+            logger.error(f"Unexpected error fetching work {openalex_id}: {exc}")
             return None
 
 

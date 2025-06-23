@@ -12,6 +12,16 @@
 - **Type Safety**: Fix type annotation issues and improve static analysis compatibility
 - **Error Handling**: Replace generic OSError catches with specific exception handling
 
+### Error Handling & Robustness 
+- **Enhanced Error Handling Patterns**: Standardize error handling across all modules
+  - Add logger to `matching.py` and replace silent exception handling with proper logging
+  - Replace generic `Exception` catches with specific exception types (`httpx.RequestError`, `UnicodeDecodeError`, etc.)
+  - Add comprehensive error handling to `find_bib_files()` with input validation and specific exception catching  
+  - Enhance file I/O error handling with specific exceptions for permission and encoding issues
+  - Improve HTTP error handling with detailed logging for different error conditions
+- **Input Validation**: Add parameter validation to prevent silent failures
+- **Error Messaging**: Improve error messages with more context and specificity
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats

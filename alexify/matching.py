@@ -1,9 +1,12 @@
+import logging
 import re
 import string
 import unicodedata
 from typing import Dict, List, Optional, Tuple
 
 from fuzzywuzzy import fuzz
+
+logger = logging.getLogger(__name__)
 
 # Stopwords for normalizing text
 STOPWORDS = {"the", "of", "and", "a", "an", "in", "to", "on", "for", "with", "la"}
@@ -62,8 +65,9 @@ def normalize_text(text: Optional[str]) -> str:
         words = text.split()
         filtered_words = [w for w in words if w not in STOPWORDS]
         return " ".join(filtered_words)
-    except Exception:
-        # As a fallback, return empty string on unexpected errors
+    except Exception as exc:
+        # Log the error before falling back to empty string
+        logger.warning(f"Error normalizing text '{text}': {exc}")
         return ""
 
 
@@ -96,8 +100,11 @@ def fuzzy_match_titles(
         partial_ratio = fuzz.partial_ratio(t1, t2)
         combined = (weight_token * token_ratio) + (weight_partial * partial_ratio)
         return float(combined)
-    except Exception:
-        # Return 0 if something goes wrong with fuzzy matching
+    except Exception as exc:
+        # Log the error before returning 0 for fuzzy matching
+        logger.warning(
+            f"Error in fuzzy matching titles '{title1}' vs '{title2}': {exc}"
+        )
         return 0.0
 
 
@@ -120,7 +127,9 @@ def normalize_name(name: Optional[str]) -> str:
         # collapse multiple spaces
         name = re.sub(r"\s+", " ", name).strip().lower()
         return name
-    except Exception:
+    except Exception as exc:
+        # Log the error before returning empty string
+        logger.warning(f"Error normalizing name '{name}': {exc}")
         return ""
 
 
@@ -182,7 +191,8 @@ def match_name_parts(bib_author: str, openalex_author: str) -> float:
 
     try:
         last_name_score = fuzz.ratio(b_last, oa_last)
-    except Exception:
+    except Exception as exc:
+        logger.warning(f"Error matching last names '{b_last}' vs '{oa_last}': {exc}")
         return 0.0
 
     if last_name_score < 90:
@@ -193,7 +203,8 @@ def match_name_parts(bib_author: str, openalex_author: str) -> float:
             fuzz.ratio(b_first, oa_first),
             fuzz.partial_ratio(b_first, oa_first),
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning(f"Error matching first names '{b_first}' vs '{oa_first}': {exc}")
         first_name_score = 0.0
 
     # If there's no middle name in either, treat as perfect for the middle name portion
@@ -204,7 +215,10 @@ def match_name_parts(bib_author: str, openalex_author: str) -> float:
             mid_name_score = max(
                 fuzz.ratio(b_mid, oa_mid), fuzz.partial_ratio(b_mid, oa_mid)
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                f"Error matching middle names '{b_mid}' vs '{oa_mid}': {exc}"
+            )
             mid_name_score = 0.0
 
     total_score = (
@@ -275,7 +289,10 @@ def fuzzy_match_authors(
             scores = [
                 match_name_parts(bib_auth, oa_auth) for oa_auth in openalex_authors
             ]
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                f"Error matching author '{bib_auth}' against OpenAlex authors: {exc}"
+            )
             scores = []
         if scores and max(scores) >= threshold:
             matches += 1

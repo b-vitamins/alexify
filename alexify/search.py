@@ -163,8 +163,11 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
                 return works_list
             return []
 
+    except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+        logger.error(f"HTTP error searching OpenAlex for '{query}': {exc}")
+        return []
     except Exception as exc:
-        logger.error(f"Error searching OpenAlex for '{query}': {exc}")
+        logger.error(f"Unexpected error searching OpenAlex for '{query}': {exc}")
         return []
 
 
@@ -309,10 +312,10 @@ def fetch_openalex_works_by_dois(dois: List[str]) -> List[Optional[str]]:
                     else:
                         local_results[idx] = result_map.get(doi_item.lower(), None)
 
-            except httpx.HTTPError as exc:
-                logger.error(f"Error fetching batch {batch}: {exc}")
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                logger.error(f"HTTP error fetching batch {batch}: {exc}")
             except Exception as exc:
-                logger.error(f"Unhandled error fetching batch {batch}: {exc}")
+                logger.error(f"Unexpected error fetching batch {batch}: {exc}")
 
             openalex_ids.extend(local_results)
 

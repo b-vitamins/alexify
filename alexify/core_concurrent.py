@@ -356,8 +356,12 @@ async def handle_fetch_concurrent(
                         json.dump(work, f, indent=2, ensure_ascii=False)
                     saved += 1
                     logger.debug(f"Saved {work_id} to {outpath}")
+                except (FileNotFoundError, PermissionError) as e:
+                    logger.error(f"File access error saving {work_id}: {e}")
+                except (json.decoder.JSONDecodeError, TypeError) as e:
+                    logger.error(f"JSON serialization error saving {work_id}: {e}")
                 except Exception as e:
-                    logger.error(f"Error saving {work_id}: {e}")
+                    logger.error(f"Unexpected error saving {work_id}: {e}")
 
     logger.info(f"Fetched and saved {saved}/{len(fetch_tasks)} works")
 
@@ -380,8 +384,10 @@ def process_files_concurrent(files: List[str], process_func, *args, **kwargs) ->
         for file, future in futures:
             try:
                 future.result()
+            except (FileNotFoundError, PermissionError) as e:
+                logger.error(f"File access error processing {file}: {e}")
             except Exception as e:
-                logger.error(f"Error processing {file}: {e}")
+                logger.error(f"Unexpected error processing {file}: {e}")
 
 
 def run_async_process(

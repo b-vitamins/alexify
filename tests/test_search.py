@@ -254,7 +254,7 @@ def test_fetch_openalex_works_by_dois_partial_failure(
         if i != 60:
             assert res[i] is None
 
-    assert "Error fetching batch" in caplog.text
+    assert "Unexpected error fetching batch" in caplog.text
 
 
 @patch("alexify.search._make_request_with_retry")

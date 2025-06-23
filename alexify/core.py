@@ -28,8 +28,14 @@ def load_bib_file(bib_path: str) -> Optional[bibtexparser.bibdatabase.BibDatabas
         parser = BibTexParser(common_strings=True)
         with open(bib_path, "r") as f:
             return bibtexparser.load(f, parser)
+    except (FileNotFoundError, PermissionError) as exc:
+        logger.error(f"File access error loading {bib_path}: {exc}")
+        return None
+    except (UnicodeDecodeError, UnicodeError) as exc:
+        logger.error(f"Unicode encoding error loading {bib_path}: {exc}")
+        return None
     except Exception as exc:
-        logger.error(f"Failed to load {bib_path}: {exc}")
+        logger.error(f"Unexpected error loading {bib_path}: {exc}")
         return None
 
 
@@ -52,38 +58,87 @@ def save_bib_file(bib_path: str, bib_db: bibtexparser.bibdatabase.BibDatabase) -
         with open(bib_path, "w") as out:
             out.write(writer.write(bib_db))
         logger.info(f"Saved BibTeX to: {bib_path}")
+    except (FileNotFoundError, PermissionError) as exc:
+        logger.error(f"File access error saving {bib_path}: {exc}")
+    except (UnicodeEncodeError, UnicodeError) as exc:
+        logger.error(f"Unicode encoding error saving {bib_path}: {exc}")
     except Exception as exc:
-        logger.error(f"Failed to save {bib_path}: {exc}")
+        logger.error(f"Unexpected error saving {bib_path}: {exc}")
 
 
 def find_bib_files(path: str, mode: str = "original") -> List[str]:
     """
-    Recursively find .bib files.
+    Recursively find .bib files with comprehensive error handling.
 
     mode='original' => only .bib not ending in '-oa.bib'
     mode='processed' => only .bib files ending in '-oa.bib'
     """
     found = []
-    if os.path.isfile(path):
-        if mode == "original":
-            if path.endswith(".bib") and not path.endswith("-oa.bib"):
-                found.append(path)
-        else:  # processed
-            if path.endswith("-oa.bib"):
-                found.append(path)
-    elif os.path.isdir(path):
-        for root, _, files in os.walk(path):
-            if "books" in root:
-                continue
-            for f in files:
+
+    # Validate input parameters
+    if not isinstance(path, str) or not path.strip():
+        logger.error("Invalid path provided: must be a non-empty string")
+        return found
+
+    if mode not in ("original", "processed"):
+        logger.error(f"Invalid mode '{mode}': must be 'original' or 'processed'")
+        return found
+
+    try:
+        # Check if path exists
+        if not os.path.exists(path):
+            logger.error(f"Path does not exist: {path}")
+            return found
+
+        # Handle file path
+        if os.path.isfile(path):
+            try:
                 if mode == "original":
-                    if f.endswith(".bib") and not f.endswith("-oa.bib"):
-                        found.append(os.path.join(root, f))
-                else:
-                    if f.endswith("-oa.bib"):
-                        found.append(os.path.join(root, f))
-    else:
-        logger.error(f"Path {path} is neither file nor directory.")
+                    if path.endswith(".bib") and not path.endswith("-oa.bib"):
+                        found.append(path)
+                else:  # processed
+                    if path.endswith("-oa.bib"):
+                        found.append(path)
+            except (OSError, PermissionError) as exc:
+                logger.error(f"Error accessing file {path}: {exc}")
+
+        # Handle directory path
+        elif os.path.isdir(path):
+            try:
+                for root, _, files in os.walk(path):
+                    # Skip books directories
+                    if "books" in root:
+                        continue
+
+                    try:
+                        for f in files:
+                            try:
+                                if mode == "original":
+                                    if f.endswith(".bib") and not f.endswith("-oa.bib"):
+                                        found.append(os.path.join(root, f))
+                                else:
+                                    if f.endswith("-oa.bib"):
+                                        found.append(os.path.join(root, f))
+                            except (OSError, ValueError) as exc:
+                                logger.warning(
+                                    f"Error processing file {f} in {root}: {exc}"
+                                )
+                                continue
+                    except (OSError, PermissionError) as exc:
+                        logger.warning(f"Error accessing directory {root}: {exc}")
+                        continue
+
+            except (OSError, PermissionError) as exc:
+                logger.error(f"Error walking directory {path}: {exc}")
+
+        else:
+            logger.error(f"Path {path} is neither file nor directory")
+
+    except (OSError, PermissionError) as exc:
+        logger.error(f"Error accessing path {path}: {exc}")
+    except Exception as exc:
+        logger.error(f"Unexpected error processing path {path}: {exc}")
+
     return found
 
 
@@ -465,8 +520,17 @@ def _fetch_and_save_work(
                 json.dump(data, f, indent=2)
             logger.info(f"Saved: {outpath}")
             return True
+    except (FileNotFoundError, PermissionError) as exc:
+        logger.error(f"File access error saving work {work_id}: {exc}")
+        return False
+    except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+        logger.error(f"HTTP error fetching work {work_id}: {exc}")
+        return False
+    except (json.decoder.JSONDecodeError, TypeError) as exc:
+        logger.error(f"JSON serialization error for work {work_id}: {exc}")
+        return False
     except Exception as exc:
-        logger.error(f"Failed fetching {work_id}: {exc}")
+        logger.error(f"Unexpected error fetching {work_id}: {exc}")
         return False
 
 

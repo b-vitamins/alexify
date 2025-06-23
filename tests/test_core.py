@@ -71,7 +71,10 @@ def test_load_bib_file_no_such_file(mock_isfile, mock_logger):
 def test_load_bib_file_exception(mock_open_f, mock_isfile, mock_logger):
     res = load_bib_file("/fake/path.bib")
     assert res is None
-    assert "Failed to load /fake/path.bib: Failure reading file" in mock_logger.text
+    assert (
+        "Unexpected error loading /fake/path.bib: Failure reading file"
+        in mock_logger.text
+    )
 
 
 ##########################
@@ -111,7 +114,7 @@ def test_save_bib_file_failure(open_mock, isfile_mock, mock_logger):
     db.entries = [{"ENTRYTYPE": "article", "ID": "xyz"}]
     open_mock.side_effect = Exception("Disk error")
     save_bib_file("/some/path.bib", db)
-    assert "Failed to save /some/path.bib: Disk error" in mock_logger.text
+    assert "Unexpected error saving /some/path.bib: Disk error" in mock_logger.text
 
 
 ##########################
@@ -119,26 +122,29 @@ def test_save_bib_file_failure(open_mock, isfile_mock, mock_logger):
 ##########################
 
 
+@patch("os.path.exists", return_value=True)
 @patch("os.path.isfile", return_value=True)
-def test_find_bib_files_file_original(mock_isfile, tmp_path):
+def test_find_bib_files_file_original(mock_isfile, mock_exists, tmp_path):
     test_path = str(tmp_path / "myfile.bib")
     found = find_bib_files(test_path, mode="original")
     assert found == [test_path]
 
 
+@patch("os.path.exists", return_value=True)
 @patch("os.path.isfile", return_value=True)
-def test_find_bib_files_file_processed(mock_isfile, tmp_path):
+def test_find_bib_files_file_processed(mock_isfile, mock_exists, tmp_path):
     test_path = str(tmp_path / "myfile-oa.bib")
     found = find_bib_files(test_path, mode="processed")
     assert found == [test_path]
 
 
+@patch("os.path.exists", return_value=False)
 @patch("os.path.isfile", return_value=False)
 @patch("os.path.isdir", return_value=False)
-def test_find_bib_files_bad_path(mock_isdir, mock_isfile, mock_logger):
+def test_find_bib_files_bad_path(mock_isdir, mock_isfile, mock_exists, mock_logger):
     out = find_bib_files("/nowhere", "original")
     assert out == []
-    assert "Path /nowhere is neither file nor directory." in mock_logger.text
+    assert "Path does not exist: /nowhere" in mock_logger.text
 
 
 @patch("os.path.isdir", return_value=True)
