@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -43,9 +44,44 @@ def validate_openalex_response(data: Any, endpoint_type: str = "works") -> bool:
     return True
 
 
-# Async cache for search results with thread safety
-_ASYNC_SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
-_CACHE_LOCK = asyncio.Lock()
+class AsyncBoundedCache:
+    """Async thread-safe bounded cache with LRU eviction policy."""
+
+    def __init__(self, maxsize: int = 1000):
+        self._cache: OrderedDict = OrderedDict()
+        self._maxsize = maxsize
+        self._lock = asyncio.Lock()
+
+    async def get(self, key: str) -> Optional[List[Dict[str, Any]]]:
+        """Get value from cache, moving key to end (most recently used)."""
+        async with self._lock:
+            if key not in self._cache:
+                return None
+            # Move to end (most recently used)
+            value = self._cache.pop(key)
+            self._cache[key] = value
+            return value
+
+    async def put(self, key: str, value: List[Dict[str, Any]]) -> None:
+        """Put value in cache, evicting oldest if necessary."""
+        async with self._lock:
+            if key in self._cache:
+                # Update existing key (move to end)
+                self._cache.pop(key)
+            elif len(self._cache) >= self._maxsize:
+                # Remove oldest item (first in OrderedDict)
+                self._cache.popitem(last=False)
+
+            self._cache[key] = value
+
+    async def clear(self) -> None:
+        """Clear the cache."""
+        async with self._lock:
+            self._cache.clear()
+
+
+# Async thread-safe bounded cache for search results
+_ASYNC_SEARCH_CACHE = AsyncBoundedCache(maxsize=1000)
 
 # Configuration for OpenAlex API
 _CONFIG = {
@@ -165,10 +201,10 @@ async def fetch_openalex_works_async(
     if not query or not isinstance(query, str):
         return []
 
-    # Check cache with lock protection
-    async with _CACHE_LOCK:
-        if query in _ASYNC_SEARCH_CACHE:
-            return _ASYNC_SEARCH_CACHE[query]
+    # Check cache first
+    cached_result = await _ASYNC_SEARCH_CACHE.get(query)
+    if cached_result is not None:
+        return cached_result
 
     try:
         logger.debug(f"Searching OpenAlex for query: {query}")
@@ -187,9 +223,8 @@ async def fetch_openalex_works_async(
 
         if data and validate_openalex_response(data, "works"):
             works_list = data["results"]
-            # Update cache with lock protection
-            async with _CACHE_LOCK:
-                _ASYNC_SEARCH_CACHE[query] = works_list
+            # Update cache
+            await _ASYNC_SEARCH_CACHE.put(query, works_list)
             return works_list
         return []
 

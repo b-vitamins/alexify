@@ -2,6 +2,7 @@ import logging
 import re
 import string
 import unicodedata
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 from fuzzywuzzy import fuzz
@@ -41,6 +42,7 @@ def clean_bibtex_entry(entry: Dict[str, str]) -> Dict[str, str]:
     return entry
 
 
+@lru_cache(maxsize=512)
 def normalize_text(text: Optional[str]) -> str:
     """
     Normalize text by:
@@ -132,6 +134,7 @@ def fuzzy_match_titles(
         return 0.0
 
 
+@lru_cache(maxsize=256)
 def normalize_name(name: Optional[str]) -> str:
     """
     Normalize an author name:
@@ -157,6 +160,7 @@ def normalize_name(name: Optional[str]) -> str:
         return ""
 
 
+@lru_cache(maxsize=256)
 def split_name_components(name: Optional[str]) -> Tuple[str, str, str]:
     """
     Split an author name into (first, middle, last).
@@ -332,16 +336,20 @@ def fuzzy_match_authors(
     matches = 0
     for bib_auth in bibtex_authors:
         try:
-            scores = [
-                match_name_parts(bib_auth, oa_auth) for oa_auth in openalex_authors
-            ]
+            # Optimize: use early termination when we find a good match
+            best_score = 0.0
+            for oa_auth in openalex_authors:
+                score = match_name_parts(bib_auth, oa_auth)
+                if score >= threshold:
+                    # Found a good match, no need to check remaining authors
+                    matches += 1
+                    break
+                best_score = max(best_score, score)
+            # If we didn't find a match above threshold, we've already checked all
         except Exception as exc:
             logger.warning(
                 f"Error matching author '{bib_auth}' against OpenAlex authors: {exc}"
             )
-            scores = []
-        if scores and max(scores) >= threshold:
-            matches += 1
 
     coverage = (matches / len(bibtex_authors)) * 100.0
 

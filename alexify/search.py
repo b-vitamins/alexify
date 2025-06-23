@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -44,9 +45,44 @@ def validate_openalex_response(data: Any, endpoint_type: str = "works") -> bool:
     return True
 
 
-# Thread-safe cache for search results
-_SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
-_CACHE_LOCK = threading.Lock()
+class BoundedCache:
+    """Thread-safe bounded cache with LRU eviction policy."""
+
+    def __init__(self, maxsize: int = 1000):
+        self._cache: OrderedDict = OrderedDict()
+        self._maxsize = maxsize
+        self._lock = threading.Lock()
+
+    def get(self, key: str) -> Optional[List[Dict[str, Any]]]:
+        """Get value from cache, moving key to end (most recently used)."""
+        with self._lock:
+            if key not in self._cache:
+                return None
+            # Move to end (most recently used)
+            value = self._cache.pop(key)
+            self._cache[key] = value
+            return value
+
+    def put(self, key: str, value: List[Dict[str, Any]]) -> None:
+        """Put value in cache, evicting oldest if necessary."""
+        with self._lock:
+            if key in self._cache:
+                # Update existing key (move to end)
+                self._cache.pop(key)
+            elif len(self._cache) >= self._maxsize:
+                # Remove oldest item (first in OrderedDict)
+                self._cache.popitem(last=False)
+
+            self._cache[key] = value
+
+    def clear(self) -> None:
+        """Clear the cache."""
+        with self._lock:
+            self._cache.clear()
+
+
+# Thread-safe bounded cache for search results
+_SEARCH_CACHE = BoundedCache(maxsize=1000)
 
 # Configuration for OpenAlex API
 _CONFIG = {
@@ -171,10 +207,10 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
     if not query or not isinstance(query, str):
         return []
 
-    # Check cache with lock protection
-    with _CACHE_LOCK:
-        if query in _SEARCH_CACHE:
-            return _SEARCH_CACHE[query]
+    # Check cache first
+    cached_result = _SEARCH_CACHE.get(query)
+    if cached_result is not None:
+        return cached_result
 
     try:
         logger.debug(f"Searching OpenAlex for query: {query}")
@@ -194,9 +230,8 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
 
             if data and validate_openalex_response(data, "works"):
                 works_list = data["results"]
-                # Update cache with lock protection
-                with _CACHE_LOCK:
-                    _SEARCH_CACHE[query] = works_list
+                # Update cache
+                _SEARCH_CACHE.put(query, works_list)
                 return works_list
             return []
 

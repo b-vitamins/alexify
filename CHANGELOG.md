@@ -37,6 +37,20 @@
   - Bounds checking for weight parameters and thresholds with automatic clamping
   - Input type validation for author lists and other critical data structures
 
+### Performance Optimization
+- **LRU Caching**: Add memory-efficient caching to expensive text processing operations
+  - Cache text normalization, name normalization, and name component splitting functions
+  - Configurable cache sizes (256-512 entries) to balance memory usage and performance
+  - Significant speedup for repeated author/title processing operations
+- **Bounded Cache Implementation**: Replace unbounded global caches with LRU-based bounded caches
+  - Thread-safe `BoundedCache` class with configurable maximum size (1000 entries)
+  - Async-safe `AsyncBoundedCache` for concurrent operations
+  - Automatic eviction of least recently used entries to prevent memory leaks
+- **Algorithm Optimization**: Improve O(n²) fuzzy matching performance
+  - Early termination in author matching when threshold is met
+  - Reduced computational overhead for large author lists
+  - Maintain same matching accuracy with improved speed
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats
