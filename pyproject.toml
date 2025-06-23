@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "alexify"
-version = "0.4.0"
+version = "0.5.0"
 description = "CLI tool and Python library for adding OpenAlex metadata to BibTeX files."
 authors = ["Ayan Das <bvits@riseup.net>"]
 readme = "README.md"

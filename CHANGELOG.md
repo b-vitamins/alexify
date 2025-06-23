@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0] - 2025-01-23
 
 ### Security & Thread Safety
 - **Critical Race Condition Fixes**: Add comprehensive thread safety to concurrent processing
