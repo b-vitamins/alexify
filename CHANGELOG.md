@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.1] - 2025-06-23
+
+### Fixed
+- **Test Fixes**: Fix failing tests in Guix build environment by adding missing `os.path.exists` mocks to `test_find_bib_files_dir_original` and `test_find_bib_files_dir_processed` functions
+
 ## [0.5.0] - 2025-01-23
 
 ### Security & Thread Safety

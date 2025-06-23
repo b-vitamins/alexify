@@ -147,9 +147,10 @@ def test_find_bib_files_bad_path(mock_isdir, mock_isfile, mock_exists, mock_logg
     assert "Path does not exist: /nowhere" in mock_logger.text
 
 
+@patch("os.path.exists", return_value=True)
 @patch("os.path.isdir", return_value=True)
 @patch("os.walk")
-def test_find_bib_files_dir_original(mock_walk, mock_isdir):
+def test_find_bib_files_dir_original(mock_walk, mock_isdir, mock_exists):
     mock_walk.return_value = [
         ("/root", [], ["file1.bib", "file2-oa.bib", "notbib.txt"]),
         ("/root/books", [], ["ignore.bib"]),
@@ -158,9 +159,10 @@ def test_find_bib_files_dir_original(mock_walk, mock_isdir):
     assert result == ["/root/file1.bib"]
 
 
+@patch("os.path.exists", return_value=True)
 @patch("os.path.isdir", return_value=True)
 @patch("os.walk")
-def test_find_bib_files_dir_processed(mock_walk, mock_isdir):
+def test_find_bib_files_dir_processed(mock_walk, mock_isdir, mock_exists):
     mock_walk.return_value = [
         ("/root", [], ["file1.bib", "file2-oa.bib"]),
         ("/root/sub", [], ["another-oa.bib"]),
