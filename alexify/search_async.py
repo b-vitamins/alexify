@@ -6,8 +6,9 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Async cache for search results
+# Async cache for search results with thread safety
 _ASYNC_SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+_CACHE_LOCK = asyncio.Lock()
 
 # Configuration for OpenAlex API
 _CONFIG = {
@@ -127,8 +128,10 @@ async def fetch_openalex_works_async(
     if not query or not isinstance(query, str):
         return []
 
-    if query in _ASYNC_SEARCH_CACHE:
-        return _ASYNC_SEARCH_CACHE[query]
+    # Check cache with lock protection
+    async with _CACHE_LOCK:
+        if query in _ASYNC_SEARCH_CACHE:
+            return _ASYNC_SEARCH_CACHE[query]
 
     try:
         logger.debug(f"Searching OpenAlex for query: {query}")
@@ -147,7 +150,9 @@ async def fetch_openalex_works_async(
 
         if data and "results" in data:
             works_list = data["results"]
-            _ASYNC_SEARCH_CACHE[query] = works_list
+            # Update cache with lock protection
+            async with _CACHE_LOCK:
+                _ASYNC_SEARCH_CACHE[query] = works_list
             return works_list
         return []
 
@@ -245,7 +250,7 @@ async def fetch_openalex_works_by_dois_async(
             processed_dois.append(None)
 
     batch_size = 50
-    openalex_ids = [None] * len(processed_dois)
+    openalex_ids: List[Optional[str]] = [None] * len(processed_dois)
 
     # Create tasks for all batches
     tasks = []
@@ -279,7 +284,7 @@ async def fetch_openalex_works_by_dois_async(
             logger.error(f"Error fetching batch starting at {batch_start}: {result}")
             continue
 
-        if not result or "results" not in result:
+        if not result or not isinstance(result, dict) or "results" not in result:
             logger.error(f"No results for batch starting at {batch_start}")
             continue
 
@@ -301,15 +306,20 @@ async def fetch_openalex_works_by_dois_async(
     return openalex_ids
 
 
-# Semaphore for rate limiting concurrent requests
+# Semaphore for rate limiting concurrent requests with thread safety
 _request_semaphore: Optional[asyncio.Semaphore] = None
+_semaphore_lock = asyncio.Lock()
 
 
-def get_request_semaphore() -> asyncio.Semaphore:
-    """Get or create the request semaphore for rate limiting."""
+async def get_request_semaphore() -> asyncio.Semaphore:
+    """Get or create the request semaphore for rate limiting with thread safety."""
     global _request_semaphore
     if _request_semaphore is None:
-        _request_semaphore = asyncio.Semaphore(_CONFIG["max_concurrent_requests"])
+        async with _semaphore_lock:
+            if _request_semaphore is None:  # Double-checked locking
+                _request_semaphore = asyncio.Semaphore(
+                    _CONFIG["max_concurrent_requests"]
+                )
     return _request_semaphore
 
 
@@ -319,7 +329,8 @@ async def fetch_work_details_async(
     """Fetch detailed work information for a single OpenAlex ID."""
     url = f"https://api.openalex.org/works/{openalex_id}"
 
-    async with get_request_semaphore():
+    semaphore = await get_request_semaphore()
+    async with semaphore:
         try:
             params = {}
             if _CONFIG["email"]:

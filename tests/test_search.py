@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from alexify.search import (
+    _CACHE_LOCK,
     _SEARCH_CACHE,
     fetch_all_candidates_for_entry,
     fetch_openalex_works,
@@ -22,11 +23,13 @@ def test_init_openalex_config_no_email():
 @pytest.fixture
 def clear_search_cache():
     """
-    Clear the _SEARCH_CACHE before and after each test.
+    Clear the _SEARCH_CACHE before and after each test with thread safety.
     """
-    _SEARCH_CACHE.clear()
+    with _CACHE_LOCK:
+        _SEARCH_CACHE.clear()
     yield
-    _SEARCH_CACHE.clear()
+    with _CACHE_LOCK:
+        _SEARCH_CACHE.clear()
 
 
 def test_init_openalex_config():

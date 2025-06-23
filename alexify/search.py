@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -6,7 +7,9 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# Thread-safe cache for search results
 _SEARCH_CACHE: Dict[str, List[Dict[str, Any]]] = {}
+_CACHE_LOCK = threading.Lock()
 
 # Configuration for OpenAlex API
 _CONFIG = {
@@ -54,7 +57,15 @@ def _make_request_with_retry(
                     # Check for Retry-After header
                     retry_after = resp.headers.get("Retry-After")
                     if retry_after:
-                        wait_time = float(retry_after)
+                        try:
+                            # Try to parse as seconds (integer)
+                            wait_time = float(retry_after)
+                        except ValueError:
+                            # If it's a date string, use default backoff
+                            wait_time = _CONFIG["backoff"] * (2**attempt)
+                            logger.warning(
+                                f"Could not parse Retry-After header '{retry_after}', using default backoff"
+                            )
                         logger.warning(
                             f"Rate limited. Waiting {wait_time}s as requested by server"
                         )
@@ -123,8 +134,10 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
     if not query or not isinstance(query, str):
         return []
 
-    if query in _SEARCH_CACHE:
-        return _SEARCH_CACHE[query]
+    # Check cache with lock protection
+    with _CACHE_LOCK:
+        if query in _SEARCH_CACHE:
+            return _SEARCH_CACHE[query]
 
     try:
         logger.debug(f"Searching OpenAlex for query: {query}")
@@ -144,7 +157,9 @@ def fetch_openalex_works(query: Optional[str]) -> List[Dict[str, Any]]:
 
             if data and "results" in data:
                 works_list = data["results"]
-                _SEARCH_CACHE[query] = works_list
+                # Update cache with lock protection
+                with _CACHE_LOCK:
+                    _SEARCH_CACHE[query] = works_list
                 return works_list
             return []
 

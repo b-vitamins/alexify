@@ -5,6 +5,7 @@ import concurrent.futures
 import json
 import logging
 import os
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -25,13 +26,17 @@ from .search_async import (
 
 logger = logging.getLogger(__name__)
 
-# Configuration for concurrent processing
+# Configuration for concurrent processing with thread safety
 _CONCURRENT_CONFIG = {
     "max_file_workers": 4,  # Process multiple files concurrently
     "max_entry_workers": 20,  # Process entries within a file concurrently
     "max_scoring_workers": 8,  # Score candidates concurrently
     "batch_size": 50,  # Batch size for processing
 }
+_CONFIG_LOCK = threading.Lock()
+
+# Lock for file I/O operations to prevent race conditions
+_FILE_IO_LOCK = threading.Lock()
 
 
 def init_concurrent_config(
@@ -40,11 +45,12 @@ def init_concurrent_config(
     max_scoring_workers: int = 8,
     batch_size: int = 50,
 ):
-    """Initialize concurrent processing configuration."""
-    _CONCURRENT_CONFIG["max_file_workers"] = max_file_workers
-    _CONCURRENT_CONFIG["max_entry_workers"] = max_entry_workers
-    _CONCURRENT_CONFIG["max_scoring_workers"] = max_scoring_workers
-    _CONCURRENT_CONFIG["batch_size"] = batch_size
+    """Initialize concurrent processing configuration with thread safety."""
+    with _CONFIG_LOCK:
+        _CONCURRENT_CONFIG["max_file_workers"] = max_file_workers
+        _CONCURRENT_CONFIG["max_entry_workers"] = max_entry_workers
+        _CONCURRENT_CONFIG["max_scoring_workers"] = max_scoring_workers
+        _CONCURRENT_CONFIG["batch_size"] = batch_size
 
 
 async def process_bib_entries_by_dois_concurrent(
@@ -84,7 +90,9 @@ async def process_bib_entries_by_dois_concurrent(
     return entries, changed
 
 
-def _compute_score_for_entry(args: Tuple[Dict[str, Any], Dict[str, Any]]) -> Tuple[float, Dict[str, Any]]:
+def _compute_score_for_entry(
+    args: Tuple[Dict[str, Any], Dict[str, Any]],
+) -> Tuple[float, Dict[str, Any]]:
     """Top-level function for multiprocessing - must be pickleable."""
     entry, candidate = args
     return compute_overall_score(entry, candidate), candidate
@@ -101,9 +109,10 @@ def score_candidates_concurrent(
     args_list = [(entry, candidate) for candidate in candidates]
 
     # Use ProcessPoolExecutor for CPU-intensive scoring
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=_CONCURRENT_CONFIG["max_scoring_workers"]
-    ) as executor:
+    with _CONFIG_LOCK:
+        max_workers = _CONCURRENT_CONFIG["max_scoring_workers"]
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         scored = list(executor.map(_compute_score_for_entry, args_list))
 
     return sorted(scored, reverse=True)
@@ -196,9 +205,10 @@ async def process_entries_batch_async(
             )
         else:
             # Create a completed future for entries that already have DOI/OpenAlex
-            future = asyncio.create_future()
-            future.set_result((False, False))
-            tasks.append(future)
+            async def dummy_future():
+                return (False, False)
+
+            tasks.append(dummy_future())
 
     results = await asyncio.gather(*tasks)
 
@@ -252,7 +262,8 @@ async def handle_process_concurrent(
             )
 
             # Process in batches
-            batch_size = _CONCURRENT_CONFIG["batch_size"]
+            with _CONFIG_LOCK:
+                batch_size = _CONCURRENT_CONFIG["batch_size"]
             total_changed = 0
             total_matched = 0
 
@@ -278,7 +289,7 @@ async def handle_process_concurrent(
     matched_total = sum(1 for e in entries if "openalex" in e)
     logger.info(f"Matched {matched_total}/{total} entries")
 
-    save_bib_file(db, outfile)
+    save_bib_file(outfile, db)
     logger.info(f"Saved to {outfile}")
 
 
@@ -327,7 +338,14 @@ async def handle_fetch_concurrent(
                 year = entries[idx]["year"]
 
             subdir = os.path.join(output_dir, str(year) if year else "unknown-year")
-            os.makedirs(subdir, exist_ok=True)
+
+            # Protect directory creation from race conditions
+            with _FILE_IO_LOCK:
+                try:
+                    os.makedirs(subdir, exist_ok=True)
+                except OSError as e:
+                    logger.error(f"Error creating directory {subdir}: {e}")
+                    continue
 
             work_id = work["id"].rsplit("/", 1)[-1]
             outpath = os.path.join(subdir, f"{work_id}.json")
@@ -349,9 +367,10 @@ def process_files_concurrent(files: List[str], process_func, *args, **kwargs) ->
     Process multiple files concurrently using ProcessPoolExecutor.
     This avoids GIL limitations for CPU-intensive operations.
     """
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=_CONCURRENT_CONFIG["max_file_workers"]
-    ) as executor:
+    with _CONFIG_LOCK:
+        max_workers = _CONCURRENT_CONFIG["max_file_workers"]
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = []
         for file in files:
             future = executor.submit(process_func, file, *args, **kwargs)
@@ -388,7 +407,9 @@ def run_async_process(
             tasks.append(task)
 
         # Process files with limited concurrency
-        sem = asyncio.Semaphore(_CONCURRENT_CONFIG["max_file_workers"])
+        with _CONFIG_LOCK:
+            max_file_workers = _CONCURRENT_CONFIG["max_file_workers"]
+        sem = asyncio.Semaphore(max_file_workers)
 
         async def process_with_sem(task):
             async with sem:
@@ -421,7 +442,9 @@ def run_async_fetch(
             tasks.append(task)
 
         # Process files with limited concurrency
-        sem = asyncio.Semaphore(_CONCURRENT_CONFIG["max_file_workers"])
+        with _CONFIG_LOCK:
+            max_file_workers = _CONCURRENT_CONFIG["max_file_workers"]
+        sem = asyncio.Semaphore(max_file_workers)
 
         async def fetch_with_sem(task):
             async with sem:

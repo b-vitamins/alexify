@@ -48,6 +48,6 @@ def test_fuzzy_matching_performance():
 
     # With python-Levenshtein, this should complete in well under 1 second
     # Without it, it might take several seconds
-    assert (
-        elapsed < 1.0
-    ), f"Fuzzy matching took {elapsed:.2f}s - performance issue detected"
+    assert elapsed < 1.0, (
+        f"Fuzzy matching took {elapsed:.2f}s - performance issue detected"
+    )

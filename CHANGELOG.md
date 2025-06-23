@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Security & Thread Safety
+- **Critical Race Condition Fixes**: Add comprehensive thread safety to concurrent processing
+  - Add `asyncio.Lock()` protection to global cache access in `search_async.py`
+  - Add `threading.Lock()` protection to global cache in `search.py`
+  - Fix global configuration race conditions in `core_concurrent.py`
+  - Implement proper singleton pattern for semaphore creation with double-checked locking
+  - Add file I/O locks to prevent concurrent directory/file creation race conditions
+- **Type Safety**: Fix type annotation issues and improve static analysis compatibility
+- **Error Handling**: Replace generic OSError catches with specific exception handling
+
 ## [0.4.1] - 2025-01-20
 - Fix pickling error in concurrent processing by moving `compute_score` to module level
 - Fix Retry-After header parsing to handle both numeric and date string formats
