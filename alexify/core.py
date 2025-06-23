@@ -9,6 +9,7 @@ import bibtexparser
 from bibtexparser.bparser import BibTexParser
 
 from .search import fetch_openalex_works_by_dois
+from .progress import create_progress_indicator
 
 logger = logging.getLogger(__name__)
 
@@ -425,14 +426,25 @@ def handle_process(bib_file: str, user_interaction: bool, force: bool, strict: b
             success_count += 1
 
     # Step B: process title-based
-    for e in without_dois:
-        changed, matched = process_bib_entry_by_title(e, user_interaction, strict)
-        if changed:
-            modified = True
-        if matched:
-            success_count += 1
-        else:
-            fail_count += 1
+    if without_dois:
+        progress = create_progress_indicator(
+            total=len(without_dois), description="Processing titles", use_logging=False
+        )
+
+        for e in without_dois:
+            changed, matched = process_bib_entry_by_title(e, user_interaction, strict)
+            if changed:
+                modified = True
+            if matched:
+                success_count += 1
+            else:
+                fail_count += 1
+
+            if progress:
+                progress.update(1)
+
+        if progress:
+            progress.finish()
 
     if modified:
         save_bib_file(new_bib, db)
@@ -467,8 +479,22 @@ def handle_fetch(bib_file: str, output_dir: str, force: bool):
             return _fetch_and_save_work(e["openalex"], bib_file, output_dir, force)
         return False
 
+    # Create progress indicator
+    progress = create_progress_indicator(
+        total=total, description="Fetching OpenAlex data", use_logging=False
+    )
+
+    def track_progress(entry):
+        result = do_fetch(entry)
+        if progress:
+            progress.update(1)
+        return result
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        results = list(executor.map(do_fetch, entries))
+        results = list(executor.map(track_progress, entries))
+
+    if progress:
+        progress.finish()
 
     fetched = sum(1 for r in results if r)
     logger.info(f"Fetched {fetched}/{total} from {bib_file}")
